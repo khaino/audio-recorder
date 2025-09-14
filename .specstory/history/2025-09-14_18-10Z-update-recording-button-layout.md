@@ -4653,3 +4653,171 @@ Try the updated MP3 conversion, and if it still doesn't work, WAV format will de
 
 ---
 
+_**User (2025-09-14 15:20Z)**_
+
+the format and download buttion should be on the same row. It should simplye be [Download] [format dropdown]
+
+---
+
+_**Assistant**_
+
+I'll modify the layout to put the download button and format dropdown on the same row, with a simpler design as you requested.
+
+---
+
+## Todo List
+
+- [-] Put Download button and format dropdown on same row with simpler layout
+
+---
+
+<details><summary>Edit file: /Volumes/MyData/dev/audio-recorder/src/App.tsx</summary>
+
+undefined
+
+**Chunk 1**
+Lines added: 33, lines removed: 38
+
+```diff
+@@ -123,43 +123,38 @@
+            {hasRecording && (
+              <div className="flex flex-col items-center space-y-4 pt-6 border-t border-gray-200">
+-               {/* Format Selection */}
++               {/* Download Button and Format Selection */}
+                <div className="flex items-center space-x-3">
+-                 <label htmlFor="format-select" className="text-sm font-medium text-gray-700">
+-                   Format:
+-                 </label>
+-                 <select
+-                   id="format-select"
+-                   value={selectedFormat}
+-                   onChange={handleFormatChange}
+-                   className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm font-medium"
+-                 >
+-                   <option value="mp3">MP3</option>
+-                   <option value="wav">WAV</option>
+-                   <option value="webm">WebM</option>
+-                 </select>
+-               </div>
+-               
+-               {/* Download Button */}
+-               <button
+-                 onClick={handleDownload}
+-                 disabled={isConverting}
+-                 className="flex items-center space-x-2 px-8 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors duration-200 shadow-lg"
+-               >
+-                 {isConverting ? (
+-                   <>
+-                     <svg className="w-5 h-5 animate-spin" fill="currentColor" viewBox="0 0 20 20">
+-                       <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+-                     </svg>
+-                     <span>Converting...</span>
+-                   </>
+-                 ) : (
+-                   <>
+-                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+-                       <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+-                     </svg>
+-                     <span>Download as {selectedFormat.toUpperCase()}</span>
+-                   </>
+-                 )}
+-               </button>
++                 <button
++                   onClick={handleDownload}
++                   disabled={isConverting}
++                   className="flex items-center space-x-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors duration-200 shadow-lg"
++                 >
++                   {isConverting ? (
++                     <>
++                       <svg className="w-5 h-5 animate-spin" fill="currentColor" viewBox="0 0 20 20">
++                         <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
++                       </svg>
++                       <span>Converting...</span>
++                     </>
++                   ) : (
++                     <>
++                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
++                         <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
++                       </svg>
++                       <span>Download</span>
++                     </>
++                   )}
++                 </button>
++                 
++                 <select
++                   value={selectedFormat}
++                   onChange={handleFormatChange}
++                   className="px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm font-medium"
++                 >
++                   <option value="mp3">MP3</option>
++                   <option value="wav">WAV</option>
++                   <option value="webm">WebM</option>
++                 </select>
++               </div>
+                
+                {/* Format Information */}
+```
+
+</details>
+
+---
+
+Let me check for any linting errors and update the todo:
+
+---
+
+
+
+---
+
+## Todo List
+
+- [x] Put Download button and format dropdown on same row with simpler layout
+
+---
+
+Perfect! I've simplified the download layout as requested. Here's what changed:
+
+## ✅ Simplified Download Layout:
+
+### **New Design:**
+```
+[After Recording - File Management Section]
+
+┌─────────────────┐  ┌─────────────┐
+│ 📥 Download     │  │ MP3    ▼   │
+└─────────────────┘  └─────────────┘
+
+Format info message (below)
+```
+
+### **Key Changes:**
+
+1. **Same Row Layout:**
+   - Download button and format dropdown are now on the same horizontal row
+   - Clean, compact design with proper spacing
+
+2. **Simplified Button Text:**
+   - Changed from "Download as MP3" to just "Download"
+   - Format is clearly indicated by the dropdown selection
+
+3. **Consistent Styling:**
+   - Both elements have matching height (`py-3`)
+   - Dropdown styling matches the button aesthetic
+   - Proper focus states and transitions
+
+4. **Clean Structure:**
+   - Download button on the left
+   - Format dropdown on the right
+   - Format information messages below (unchanged)
+
+### **User Experience:**
+- **Cleaner Interface:** Less visual clutter
+- **Intuitive Layout:** Button + dropdown is a familiar pattern
+- **Responsive:** Works well on all screen sizes
+- **Accessible:** Proper focus management and keyboard navigation
+
+The layout is now much cleaner and more intuitive - users can simply click "Download" and the format is determined by the dropdown selection right next to it!
+
+---
+
