@@ -4821,3 +4821,104 @@ The layout is now much cleaner and more intuitive - users can simply click "Down
 
 ---
 
+_**User (2025-09-14 15:20Z)**_
+
+The wave box should be wider, but the max should be 1200px qauivalent in normal screen. the Wave box should be dark, cool looking and the wave should be soft light color that will look more attractive.
+
+---
+
+_**Assistant**_
+
+I'll modify the WaveformVisualizer to make it wider (up to 1200px), give it a dark, cool-looking background, and use soft light colors for the waves to make it more attractive.
+
+---
+
+## Todo List
+
+- [-] Make waveform wider (max 1200px), dark cool background, soft light wave colors
+
+---
+
+<details><summary>Edit file: /Volumes/MyData/dev/audio-recorder/src/components/WaveformVisualizer.tsx</summary>
+
+undefined
+
+**Chunk 1**
+Lines added: 3, lines removed: 3
+
+```diff
+@@ -51,7 +51,7 @@
+    const [playbackStartTime, setPlaybackStartTime] = useState<number | null>(null);
+  
+-   const width = 800;
+-   const height = 200;
+-   const cornerRadius = 20;
++   const width = 1200;
++   const height = 240;
++   const cornerRadius = 24;
+  
+    // Function to get real audio amplitude from analyser
+```
+
+</details>
+
+---
+
+Now let me update the canvas drawing code to use a dark, cool background and soft light wave colors:
+
+---
+
+<details><summary>Edit file: /Volumes/MyData/dev/audio-recorder/src/components/WaveformVisualizer.tsx</summary>
+
+undefined
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -250,5 +250,5 @@
+        ctx.clearRect(0, 0, width, height);
+  
+-       // Draw rounded rectangle background
++       // Draw rounded rectangle background with dark, cool gradient
+        ctx.beginPath();
+        // Fallback for browsers that don't support roundRect
+```
+
+**Chunk 2**
+Lines added: 15, lines removed: 2
+
+```diff
+@@ -259,7 +259,20 @@
+          ctx.rect(0, 0, width, height);
+        }
+-       ctx.fillStyle = recordingState === 'recording' ? '#fee2e2' : '#f3f4f6';
++       
++       // Create dark gradient background
++       const gradient = ctx.createLinearGradient(0, 0, 0, height);
++       if (recordingState === 'recording') {
++         gradient.addColorStop(0, '#1f2937'); // Dark blue-gray
++         gradient.addColorStop(1, '#374151'); // Slightly lighter blue-gray
++       } else {
++         gradient.addColorStop(0, '#111827'); // Very dark blue-gray
++         gradient.addColorStop(1, '#1f2937'); // Dark blue-gray
++       }
++       
++       ctx.fillStyle = gradient;
+        ctx.fill();
+-       ctx.strokeStyle = recordingState === 'recording' ? '#ef4444' : '#d1d5db';
++       
++       // Subtle border with cool color
++       ctx.strokeStyle = recordingState === 'recording' ? '#60a5fa' : '#4b5563';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+```
+
+</details>
+
+---
+
+Now let me update the waveform bar colors
+
+---
+

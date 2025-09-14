@@ -50,9 +50,9 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   const [debugInfo, setDebugInfo] = useState<string>('');
   const [playbackStartTime, setPlaybackStartTime] = useState<number | null>(null);
 
-  const width = 800;
-  const height = 200;
-  const cornerRadius = 20;
+  const width = 1200;
+  const height = 240;
+  const cornerRadius = 24;
 
   // Function to get real audio amplitude from analyser
   const getRealAudioAmplitude = (): number => {
@@ -249,7 +249,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       // Clear canvas
       ctx.clearRect(0, 0, width, height);
 
-      // Draw rounded rectangle background
+      // Draw rounded rectangle background with dark, cool gradient
       ctx.beginPath();
       // Fallback for browsers that don't support roundRect
       if (ctx.roundRect) {
@@ -258,9 +258,22 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         // Draw regular rectangle as fallback
         ctx.rect(0, 0, width, height);
       }
-      ctx.fillStyle = recordingState === 'recording' ? '#fee2e2' : '#f3f4f6';
+      
+      // Create dark gradient background
+      const gradient = ctx.createLinearGradient(0, 0, 0, height);
+      if (recordingState === 'recording') {
+        gradient.addColorStop(0, '#1f2937'); // Dark blue-gray
+        gradient.addColorStop(1, '#374151'); // Slightly lighter blue-gray
+      } else {
+        gradient.addColorStop(0, '#111827'); // Very dark blue-gray
+        gradient.addColorStop(1, '#1f2937'); // Dark blue-gray
+      }
+      
+      ctx.fillStyle = gradient;
       ctx.fill();
-      ctx.strokeStyle = recordingState === 'recording' ? '#ef4444' : '#d1d5db';
+      
+      // Subtle border with cool color
+      ctx.strokeStyle = recordingState === 'recording' ? '#60a5fa' : '#4b5563';
       ctx.lineWidth = 2;
       ctx.stroke();
 
@@ -274,60 +287,81 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
           const x = 20 + index * barWidth;
           const y = centerY - barHeight / 2;
 
-          // Determine bar color
-          let barColor = '#9ca3af';
+          // Determine bar color with soft, light colors
+          let barColor = '#6b7280'; // Default soft gray
           if (recordingState === 'recording') {
-            // Add a subtle pulse effect for the most recent bars during recording
+            // Soft cyan/blue gradient for recording with pulse effect
             const isRecentBar = index >= waveformData.length - 10;
-            const pulseIntensity = isRecentBar ? 0.8 + 0.2 * Math.sin(Date.now() / 200) : 0.8;
-            const red = Math.floor(239 * pulseIntensity);
-            const green = Math.floor(68 * pulseIntensity);
-            const blue = Math.floor(68 * pulseIntensity);
-            barColor = `rgb(${red}, ${green}, ${blue})`;
+            const pulseIntensity = isRecentBar ? 0.7 + 0.3 * Math.sin(Date.now() / 300) : 0.6;
+            const opacity = 0.8 + 0.2 * pulseIntensity;
+            
+            // Create gradient for each bar
+            const barGradient = ctx.createLinearGradient(x, y, x, y + barHeight);
+            barGradient.addColorStop(0, `rgba(56, 189, 248, ${opacity})`); // Light blue
+            barGradient.addColorStop(1, `rgba(14, 165, 233, ${opacity * 0.8})`); // Slightly darker blue
+            barColor = barGradient;
           } else if (playbackState === 'playing') {
-            // During playback, show real-time audio with green pulse for recent bars
+            // Soft green/cyan gradient for playback with pulse for recent bars
             const isRecentBar = index >= waveformData.length - 10;
-            const pulseIntensity = isRecentBar ? 0.8 + 0.2 * Math.sin(Date.now() / 200) : 0.8;
-            const red = Math.floor(34 * pulseIntensity);
-            const green = Math.floor(197 * pulseIntensity);
-            const blue = Math.floor(94 * pulseIntensity);
-            barColor = `rgb(${red}, ${green}, ${blue})`;
+            const pulseIntensity = isRecentBar ? 0.7 + 0.3 * Math.sin(Date.now() / 300) : 0.6;
+            const opacity = 0.8 + 0.2 * pulseIntensity;
+            
+            const barGradient = ctx.createLinearGradient(x, y, x, y + barHeight);
+            barGradient.addColorStop(0, `rgba(52, 211, 153, ${opacity})`); // Light green
+            barGradient.addColorStop(1, `rgba(16, 185, 129, ${opacity * 0.8})`); // Slightly darker green
+            barColor = barGradient;
           } else if (playbackState === 'paused') {
-            // Show static green bars when paused
-            barColor = '#22c55e';
+            // Soft static green for paused state
+            const barGradient = ctx.createLinearGradient(x, y, x, y + barHeight);
+            barGradient.addColorStop(0, 'rgba(52, 211, 153, 0.7)'); // Light green
+            barGradient.addColorStop(1, 'rgba(16, 185, 129, 0.5)'); // Darker green
+            barColor = barGradient;
+          } else {
+            // Soft gray gradient for idle state
+            const barGradient = ctx.createLinearGradient(x, y, x, y + barHeight);
+            barGradient.addColorStop(0, 'rgba(156, 163, 175, 0.6)'); // Light gray
+            barGradient.addColorStop(1, 'rgba(107, 114, 128, 0.4)'); // Darker gray
+            barColor = barGradient;
           }
 
           ctx.fillStyle = barColor;
           ctx.fillRect(x, y, Math.max(barWidth - 1, 1), barHeight);
         });
       } else {
-        // Draw placeholder text
-        ctx.fillStyle = '#9ca3af';
-        ctx.font = '16px system-ui';
+        // Draw placeholder text with light color for dark background
+        ctx.fillStyle = '#d1d5db';
+        ctx.font = '18px system-ui, -apple-system, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('Click Record to start recording...', width / 2, height / 2);
       }
 
-      // Draw progress indicator line
+      // Draw progress indicator line with soft glow effect
       if (duration > 0 && waveformData.length > 0) {
         const progress = Math.min(currentTime / duration, 1);
         const lineX = 20 + progress * (width - 40);
 
+        // Create glow effect
+        ctx.shadowColor = playbackState === 'playing' ? '#34d399' : recordingState === 'recording' ? '#60a5fa' : '#9ca3af';
+        ctx.shadowBlur = 8;
+        
         ctx.beginPath();
-        ctx.moveTo(lineX, 10);
-        ctx.lineTo(lineX, height - 10);
-        ctx.strokeStyle = playbackState === 'playing' ? '#22c55e' : recordingState === 'recording' ? '#ef4444' : '#9ca3af';
+        ctx.moveTo(lineX, 15);
+        ctx.lineTo(lineX, height - 15);
+        ctx.strokeStyle = playbackState === 'playing' ? '#34d399' : recordingState === 'recording' ? '#60a5fa' : '#9ca3af';
         ctx.lineWidth = 3;
         ctx.stroke();
 
-        // Draw progress indicator circle
+        // Draw progress indicator circle with glow
         ctx.beginPath();
-        ctx.arc(lineX, height / 2, 8, 0, 2 * Math.PI);
-        ctx.fillStyle = playbackState === 'playing' ? '#22c55e' : recordingState === 'recording' ? '#ef4444' : '#9ca3af';
+        ctx.arc(lineX, height / 2, 10, 0, 2 * Math.PI);
+        ctx.fillStyle = playbackState === 'playing' ? '#34d399' : recordingState === 'recording' ? '#60a5fa' : '#9ca3af';
         ctx.fill();
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 2;
         ctx.stroke();
+        
+        // Reset shadow
+        ctx.shadowBlur = 0;
       }
     };
 
@@ -375,7 +409,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         />
       </div>
       
-      <div className="flex justify-between items-center w-full max-w-[800px] text-sm text-gray-600">
+      <div className="flex justify-between items-center w-full max-w-[1200px] text-sm text-gray-600">
         {/* Left timestamp - only show during playback */}
         {(playbackState === 'playing' || playbackState === 'paused') && (
           <span>{formatTime(currentTime)}</span>
