@@ -36,15 +36,15 @@ export const AudioInputSelector: React.FC<AudioInputSelectorProps> = ({
   }
 
   return (
-    <div className="flex flex-col space-y-2">
-      <label htmlFor="audio-input-select" className="text-sm font-medium text-gray-700">
+    <div className="flex items-center space-x-3">
+      <label htmlFor="audio-input-select" className="text-sm font-medium text-gray-700 whitespace-nowrap">
         Audio Input Device
       </label>
       <select
         id="audio-input-select"
         value={selectedDeviceId}
         onChange={(e) => handleDeviceChange(e.target.value)}
-        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
+        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm font-medium text-gray-900 flex-1"
       >
         {devices.map((device) => (
           <option key={device.deviceId} value={device.deviceId}>

@@ -13,7 +13,7 @@ export interface AudioEnhancementData {
 
 export interface AudioEnhancementActions {
   updateSettings: (settings: Partial<AudioEnhancementSettings>) => void;
-  processBuffer: (audioBuffer: AudioBuffer, audioContext: AudioContext) => { source: AudioBufferSourceNode, output: AudioNode };
+  processBuffer: (audioBuffer: AudioBuffer, audioContext: AudioContext, volumeLevel?: 'low' | 'standard' | 'high') => { source: AudioBufferSourceNode, output: AudioNode };
   cleanup: () => void;
 }
 
@@ -31,7 +31,17 @@ export const useAudioEnhancement = () => {
     setSettings(prev => ({ ...prev, ...newSettings }));
   }, []);
 
-  const createProcessingChain = useCallback((audioContext: AudioContext, source: AudioBufferSourceNode) => {
+  // Volume level to gain multiplier mapping
+  const getVolumeMultiplier = useCallback((volume: 'low' | 'standard' | 'high'): number => {
+    switch (volume) {
+      case 'low': return 1.5;      // +3.5dB
+      case 'standard': return 3.0; // +9.5dB
+      case 'high': return 4.5;     // +13dB
+      default: return 3.0;
+    }
+  }, []);
+
+  const createProcessingChain = useCallback((audioContext: AudioContext, source: AudioBufferSourceNode, volumeLevel: 'low' | 'standard' | 'high' = 'standard') => {
     const chain: AudioNode[] = [source];
     
     // 1. Initial cleanup filters
@@ -109,9 +119,10 @@ export const useAudioEnhancement = () => {
     noiseGate.release.setValueAtTime(0.2, audioContext.currentTime);
     chain.push(noiseGate);
     
-    // 8. Professional makeup gain for balanced loudness
+    // 8. Dynamic makeup gain based on user volume preference
     const makeupGain = audioContext.createGain();
-    makeupGain.gain.setValueAtTime(3.0, audioContext.currentTime); // +9.5dB boost (3.0x = ~9.5dB)
+    const volumeMultiplier = getVolumeMultiplier(volumeLevel);
+    makeupGain.gain.setValueAtTime(volumeMultiplier, audioContext.currentTime);
     chain.push(makeupGain);
     
     // 9. Safety limiter
@@ -129,16 +140,16 @@ export const useAudioEnhancement = () => {
     }
 
     return chain;
-  }, []);
+  }, [getVolumeMultiplier]);
 
-  const processBuffer = useCallback((audioBuffer: AudioBuffer, audioContext: AudioContext): { source: AudioBufferSourceNode, output: AudioNode } => {
+  const processBuffer = useCallback((audioBuffer: AudioBuffer, audioContext: AudioContext, volumeLevel: 'low' | 'standard' | 'high' = 'standard'): { source: AudioBufferSourceNode, output: AudioNode } => {
     try {
       // Create buffer source
       const source = audioContext.createBufferSource();
       source.buffer = audioBuffer;
       
-      // Create processing chain starting from the source
-      const chain = createProcessingChain(audioContext, source);
+      // Create processing chain starting from the source with volume level
+      const chain = createProcessingChain(audioContext, source, volumeLevel);
       
       // Store processing chain reference for cleanup
       processingChainRef.current = chain;

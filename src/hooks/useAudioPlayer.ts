@@ -20,7 +20,8 @@ export interface AudioPlayerActions {
 
 export const useAudioPlayer = (
   audioUrl: string | null,
-  autoEnhance: boolean = true
+  autoEnhance: boolean = true,
+  volumeLevel: 'low' | 'standard' | 'high' = 'standard'
 ) => {
   const [state, setState] = useState<PlaybackState>('idle');
   const [currentTime, setCurrentTime] = useState(0);
@@ -30,10 +31,21 @@ export const useAudioPlayer = (
   const [isProcessing, setIsProcessing] = useState(false);
   const [processedAudioUrl, setProcessedAudioUrl] = useState<string | null>(null);
   const [lastProcessedUrl, setLastProcessedUrl] = useState<string | null>(null);
+  const [lastProcessedVolume, setLastProcessedVolume] = useState<'low' | 'standard' | 'high' | null>(null);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const intervalRef = useRef<number | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+
+  // Volume level to gain multiplier mapping
+  const getVolumeMultiplier = useCallback((volume: 'low' | 'standard' | 'high'): number => {
+    switch (volume) {
+      case 'low': return 1.5;      // +3.5dB
+      case 'standard': return 3.0; // +9.5dB
+      case 'high': return 4.5;     // +13dB
+      default: return 3.0;
+    }
+  }, []);
 
   const updateTime = useCallback(() => {
     if (audioRef.current) {
@@ -56,6 +68,7 @@ export const useAudioPlayer = (
   // Auto-enhancement processing
   const processAudio = useCallback(async (url: string): Promise<string | null> => {
     if (!autoEnhance) return null;
+    
     
     try {
       setIsProcessing(true);
@@ -82,8 +95,8 @@ export const useAudioPlayer = (
       const source = offlineContext.createBufferSource();
       source.buffer = audioBuffer;
       
-      // Apply the enhancement chain (imported from useAudioEnhancement logic)
-      const chain = createEnhancementChain(offlineContext, source);
+      // Apply the enhancement chain with volume level
+      const chain = createEnhancementChain(offlineContext, source, volumeLevel);
       
       // Connect to destination
       const lastNode = chain[chain.length - 1];
@@ -107,10 +120,10 @@ export const useAudioPlayer = (
       setIsProcessing(false);
       return null;
     }
-  }, [autoEnhance]);
+  }, [autoEnhance, volumeLevel]);
 
   // Enhanced processing chain - simplified but powerful
-  const createEnhancementChain = useCallback((audioContext: AudioContext | OfflineAudioContext, source: AudioBufferSourceNode) => {
+  const createEnhancementChain = useCallback((audioContext: AudioContext | OfflineAudioContext, source: AudioBufferSourceNode, volumeLevel: 'low' | 'standard' | 'high' = 'standard') => {
     const chain: AudioNode[] = [source];
     
     // 1. Initial cleanup filters
@@ -188,9 +201,10 @@ export const useAudioPlayer = (
     noiseGate.release.setValueAtTime(0.2, audioContext.currentTime);
     chain.push(noiseGate);
     
-    // 8. Professional makeup gain for balanced loudness
+    // 8. Dynamic makeup gain based on user volume preference
     const makeupGain = audioContext.createGain();
-    makeupGain.gain.setValueAtTime(3.0, audioContext.currentTime); // +9.5dB boost (3.0x = ~9.5dB)
+    const volumeMultiplier = getVolumeMultiplier(volumeLevel);
+    makeupGain.gain.setValueAtTime(volumeMultiplier, audioContext.currentTime);
     chain.push(makeupGain);
     
     // 9. Safety limiter
@@ -208,7 +222,7 @@ export const useAudioPlayer = (
     }
 
     return chain;
-  }, []);
+  }, [getVolumeMultiplier, volumeLevel]);
 
   // Helper to convert AudioBuffer to WAV
   const audioBufferToWav = useCallback((buffer: AudioBuffer): ArrayBuffer => {
@@ -279,8 +293,8 @@ export const useAudioPlayer = (
     if (audioUrl) {
       // Auto-process audio when loaded
       if (autoEnhance) {
-        // Check if we already processed this URL
-        if (lastProcessedUrl === audioUrl && processedAudioUrl) {
+        // Check if we already processed this URL with the same volume level
+        if (lastProcessedUrl === audioUrl && lastProcessedVolume === volumeLevel && processedAudioUrl) {
           // Reuse existing processed audio
           const audio = new Audio(processedAudioUrl);
           audioRef.current = audio;
@@ -299,6 +313,7 @@ export const useAudioPlayer = (
         } else {
           // Process new audio
           setLastProcessedUrl(audioUrl);
+          setLastProcessedVolume(volumeLevel);
           processAudio(audioUrl).then(processedUrl => {
           if (processedUrl) {
             setProcessedAudioUrl(processedUrl);
@@ -417,7 +432,7 @@ export const useAudioPlayer = (
         setAnalyser(null);
       }
     }
-  }, [audioUrl, updateTime, stopTimer, audioContext, autoEnhance, processAudio, processedAudioUrl, lastProcessedUrl]);
+  }, [audioUrl, updateTime, stopTimer, audioContext, autoEnhance, processAudio, processedAudioUrl, lastProcessedUrl, lastProcessedVolume, volumeLevel]);
 
   const play = useCallback(async () => {
     if (audioRef.current) {

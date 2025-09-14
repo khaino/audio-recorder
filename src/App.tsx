@@ -10,13 +10,14 @@ import { useAudioEnhancement } from './hooks/useAudioEnhancement';
 function App() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [selectedFormat, setSelectedFormat] = useState<'mp3' | 'wav' | 'webm'>('mp3');
+  const [selectedVolume, setSelectedVolume] = useState<'low' | 'standard' | 'high'>('standard');
   const [isConverting, setIsConverting] = useState(false);
   
   // Audio enhancement hook
   const { data: enhancementData, actions: enhancementActions } = useAudioEnhancement();
   
   const { data: recorderData, actions: recorderActions } = useAudioRecorder(selectedDeviceId);
-  const { data: playerData, actions: playerActions } = useAudioPlayer(recorderData.audioUrl, true); // Enable auto-enhancement
+  const { data: playerData, actions: playerActions } = useAudioPlayer(recorderData.audioUrl, true, selectedVolume); // Enable auto-enhancement with volume
   const { downloadAudio } = useFileManager();
 
   const handleDeviceChange = useCallback((deviceId: string) => {
@@ -32,7 +33,7 @@ function App() {
           recorderData.audioBlob, 
           filename, 
           selectedFormat,
-          enhancementActions.processBuffer // Apply current enhancement settings
+          (audioBuffer, audioContext) => enhancementActions.processBuffer(audioBuffer, audioContext, selectedVolume) // Apply current enhancement settings with volume
         );
       } catch (error) {
         console.error('Download failed:', error);
@@ -40,10 +41,14 @@ function App() {
         setIsConverting(false);
       }
     }
-  }, [recorderData.audioBlob, downloadAudio, selectedFormat, isConverting, enhancementActions.processBuffer]);
+  }, [recorderData.audioBlob, downloadAudio, selectedFormat, selectedVolume, isConverting, enhancementActions.processBuffer]);
 
   const handleFormatChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedFormat(event.target.value as 'mp3' | 'wav' | 'webm');
+  }, []);
+
+  const handleVolumeChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedVolume(event.target.value as 'low' | 'standard' | 'high');
   }, []);
 
   const hasRecording = recorderData.audioBlob !== null;
@@ -77,10 +82,27 @@ function App() {
 
         {/* Main Content */}
         <div className="bg-white rounded-2xl shadow-xl p-8 space-y-8">
-          {/* Audio Input Selector */}
-          <div className="flex justify-center">
-            <div className="w-full max-w-md">
-              <AudioInputSelector onDeviceChange={handleDeviceChange} />
+          {/* Top Controls Row */}
+          <div className="flex justify-between items-center">
+            {/* Left: Audio Input Device - Only show when no recording exists */}
+            {!hasRecording && (
+              <div className="w-64">
+                <AudioInputSelector onDeviceChange={handleDeviceChange} />
+              </div>
+            )}
+            
+            {/* Right: Volume Control */}
+            <div className={`flex items-center space-x-3 ${hasRecording ? 'ml-auto' : ''}`}>
+              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Volume</label>
+              <select
+                value={selectedVolume}
+                onChange={handleVolumeChange}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm font-medium text-gray-900 w-32"
+              >
+                <option value="low">Low</option>
+                <option value="standard">Standard</option>
+                <option value="high">High</option>
+              </select>
             </div>
           </div>
 
@@ -154,7 +176,7 @@ function App() {
               
               {/* Enhancement Status */}
               <div className="text-xs text-purple-600 bg-purple-50 px-3 py-2 rounded-lg border border-purple-200">
-                <span className="font-medium">🎛️</span> Audio automatically enhanced with noise reduction, voice optimization, and warm tone
+                <span className="font-medium">🎛️</span> Audio enhanced with professional processing • Volume: {selectedVolume.charAt(0).toUpperCase() + selectedVolume.slice(1)}
               </div>
 
               {/* Format Information */}
