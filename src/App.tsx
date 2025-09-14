@@ -74,18 +74,18 @@ function App() {
 
           {/* Audio Controls */}
           <div className="flex justify-center">
-            <AudioControls
-              recordingState={recorderData.state}
-              playbackState={playerData.state}
-              hasRecording={hasRecording}
-              onRecord={recorderActions.startRecording}
-              onPauseRecording={recorderActions.pauseRecording}
-              onStopRecording={recorderActions.stopRecording}
-              onPlay={playerActions.play}
-              onPausePlayback={playerActions.pause}
-              onStopPlayback={playerActions.stop}
-              onReset={recorderActions.resetRecording}
-            />
+          <AudioControls
+            recordingState={recorderData.state}
+            playbackState={playerData.state}
+            hasRecording={hasRecording}
+            onRecord={recorderActions.startRecording}
+            onPauseRecording={recorderActions.pauseRecording}
+            onStopRecording={recorderActions.stopRecording}
+            onPlay={playerActions.play}
+            onPausePlayback={playerActions.pause}
+            onStopPlayback={playerActions.stop}
+            onStartNewRecording={recorderActions.resetRecording}
+          />
           </div>
 
           {/* File Management */}
