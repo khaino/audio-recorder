@@ -34,6 +34,7 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
   const startTimeRef = useRef<number>(0);
   const pausedTimeRef = useRef<number>(0);
   const intervalRef = useRef<number | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
 
   const updateTimer = useCallback(() => {
     if (state === 'recording') {
@@ -67,15 +68,36 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
       
       // Set up Web Audio API for real-time analysis
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      // Ensure audio context is resumed (required for some browsers)
+      if (audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+      }
+      
       const source = audioCtx.createMediaStreamSource(stream);
       const analyserNode = audioCtx.createAnalyser();
       
-      analyserNode.fftSize = 256;
-      analyserNode.smoothingTimeConstant = 0.8;
+      // More aggressive settings for better responsiveness
+      analyserNode.fftSize = 512;  // Increased for better resolution
+      analyserNode.smoothingTimeConstant = 0.3;  // Less smoothing for more responsive data
+      analyserNode.minDecibels = -90;
+      analyserNode.maxDecibels = -10;
+      
       source.connect(analyserNode);
       
+      // Keep references
+      sourceRef.current = source;
       setAudioContext(audioCtx);
       setAnalyser(analyserNode);
+      
+      console.log('Audio context state:', audioCtx.state);
+      console.log('Analyser setup complete for recording');
+      console.log('Stream tracks:', stream.getTracks().map(track => ({
+        kind: track.kind,
+        enabled: track.enabled,
+        readyState: track.readyState,
+        label: track.label
+      })));
       
       // Configure MediaRecorder with better options
       let options: MediaRecorderOptions = {};
@@ -117,6 +139,11 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
         if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => track.stop());
           streamRef.current = null;
+        }
+        
+        if (sourceRef.current) {
+          sourceRef.current.disconnect();
+          sourceRef.current = null;
         }
         
         if (audioContext) {
@@ -178,6 +205,11 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
+    }
+    
+    if (sourceRef.current) {
+      sourceRef.current.disconnect();
+      sourceRef.current = null;
     }
     
     if (audioContext) {
