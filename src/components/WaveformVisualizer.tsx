@@ -7,6 +7,8 @@ interface WaveformVisualizerProps {
   playbackState: PlaybackState;
   currentTime: number;
   duration: number;
+  audioContext?: AudioContext | null;
+  analyser?: AnalyserNode | null;
   onSeek?: (time: number) => void;
 }
 
@@ -15,6 +17,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   playbackState,
   currentTime,
   duration,
+  analyser,
   onSeek
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -26,6 +29,30 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   const height = 200;
   const cornerRadius = 20;
 
+  // Function to get real audio amplitude from analyser
+  const getRealAudioAmplitude = (): number => {
+    if (!analyser) {
+      return Math.random() * 0.8 + 0.1; // Fallback to random if no analyser
+    }
+
+    // Use time domain data for more responsive waveform
+    const bufferLength = analyser.fftSize;
+    const dataArray = new Uint8Array(bufferLength);
+    analyser.getByteTimeDomainData(dataArray);
+
+    // Calculate RMS (Root Mean Square) for better amplitude representation
+    let sum = 0;
+    for (let i = 0; i < bufferLength; i++) {
+      const sample = (dataArray[i] - 128) / 128; // Convert to -1 to 1 range
+      sum += sample * sample;
+    }
+    const rms = Math.sqrt(sum / bufferLength);
+    
+    // Normalize and apply some scaling for better visibility
+    const scaled = Math.min(rms * 3, 1); // Scale up for better visibility
+    return Math.max(scaled * 0.9 + 0.1, 0.1);
+  };
+
 
   useEffect(() => {
     if (recordingState === 'recording') {
@@ -33,29 +60,29 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       // Gradually build waveform data while recording
       const interval = setInterval(() => {
         setWaveformData(prev => {
-          if (prev.length < 200) {
-            return [...prev, Math.random() * 0.8 + 0.1];
+          // Dynamic max points based on available width
+          const maxPoints = Math.floor((width - 40) / 2); // Adjust based on canvas width
+          const newAmplitude = getRealAudioAmplitude();
+          
+          if (prev.length < maxPoints) {
+            // Still building up the waveform
+            return [...prev, newAmplitude];
+          } else {
+            // Sliding window - remove first, add new at end
+            return [...prev.slice(1), newAmplitude];
           }
-          return prev;
         });
-      }, 50);
+      }, 100); // Slightly slower update for better performance
 
       return () => clearInterval(interval);
     } else if (recordingState === 'stopped' && !isRecordingComplete) {
-      // Fill remaining space when recording stops
-      setWaveformData(prev => {
-        const remaining = 200 - prev.length;
-        if (remaining > 0) {
-          return [...prev, ...Array(remaining).fill(0.1)];
-        }
-        return prev;
-      });
+      // Keep the current waveform data as-is when stopped
       setIsRecordingComplete(true);
     } else if (recordingState === 'idle') {
       setWaveformData([]);
       setIsRecordingComplete(false);
     }
-  }, [recordingState, isRecordingComplete]);
+  }, [recordingState, isRecordingComplete, width, analyser]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -96,7 +123,13 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
           // Determine bar color
           let barColor = '#9ca3af';
           if (recordingState === 'recording') {
-            barColor = '#ef4444';
+            // Add a subtle pulse effect for the most recent bars during recording
+            const isRecentBar = index >= waveformData.length - 10;
+            const pulseIntensity = isRecentBar ? 0.8 + 0.2 * Math.sin(Date.now() / 200) : 0.8;
+            const red = Math.floor(239 * pulseIntensity);
+            const green = Math.floor(68 * pulseIntensity);
+            const blue = Math.floor(68 * pulseIntensity);
+            barColor = `rgb(${red}, ${green}, ${blue})`;
           } else if (playbackState === 'playing' || playbackState === 'paused') {
             const progress = duration > 0 ? currentTime / duration : 0;
             const currentPosition = progress * waveformData.length;

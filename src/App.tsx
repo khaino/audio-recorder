@@ -66,6 +66,8 @@ function App() {
               playbackState={playerData.state}
               currentTime={currentTime}
               duration={duration}
+              audioContext={recorderData.audioContext}
+              analyser={recorderData.analyser}
               onSeek={playerActions.seek}
             />
           </div>
