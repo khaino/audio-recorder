@@ -57,6 +57,25 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
 
   const startRecording = useCallback(async () => {
     try {
+      if (state === 'paused') {
+        // Resume existing recording
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'paused') {
+          // Adjust start time to account for paused duration
+          const pausedDuration = Date.now() - pausedTimeRef.current;
+          startTimeRef.current += pausedDuration;
+          
+          console.log('Resuming paused recording');
+          mediaRecorderRef.current.resume();
+          setState('recording');
+          startTimer();
+          return;
+        } else {
+          console.error('Cannot resume: MediaRecorder is not in paused state');
+          return;
+        }
+      }
+
+      // Start new recording
       const constraints: MediaStreamConstraints = {
         audio: selectedDeviceId 
           ? { deviceId: { exact: selectedDeviceId } }
@@ -157,27 +176,20 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
         console.error('MediaRecorder error:', event);
       };
       
-      if (state === 'paused') {
-        // Resume recording - adjust start time to account for paused duration
-        const pausedDuration = Date.now() - pausedTimeRef.current;
-        startTimeRef.current += pausedDuration;
-        mediaRecorder.resume();
-      } else {
-        // Start new recording
-        startTimeRef.current = Date.now();
-        pausedTimeRef.current = 0;
-        setCurrentTime(0);
-        // Start recording with a timeslice of 1000ms to ensure continuous recording
-        console.log('Starting new recording with timeslice 1000ms');
-        mediaRecorder.start(1000);
-      }
+      // Start new recording
+      startTimeRef.current = Date.now();
+      pausedTimeRef.current = 0;
+      setCurrentTime(0);
+      // Start recording with a timeslice of 1000ms to ensure continuous recording
+      console.log('Starting new recording with timeslice 1000ms');
+      mediaRecorder.start(1000);
       
       setState('recording');
       startTimer();
     } catch (error) {
       console.error('Error starting recording:', error);
     }
-  }, [selectedDeviceId, state, currentTime, startTimer]);
+  }, [selectedDeviceId, state, currentTime, startTimer, audioContext]);
 
   const pauseRecording = useCallback(() => {
     if (mediaRecorderRef.current && state === 'recording') {

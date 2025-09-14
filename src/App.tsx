@@ -83,6 +83,7 @@ function App() {
               onStopRecording={recorderActions.stopRecording}
               onPlay={playerActions.play}
               onPausePlayback={playerActions.pause}
+              onStopPlayback={playerActions.stop}
               onReset={recorderActions.resetRecording}
             />
           </div>

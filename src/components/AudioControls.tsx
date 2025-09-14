@@ -11,6 +11,7 @@ interface AudioControlsProps {
   onStopRecording: () => void;
   onPlay: () => void;
   onPausePlayback: () => void;
+  onStopPlayback: () => void;
   onReset: () => void;
 }
 
@@ -23,6 +24,7 @@ export const AudioControls: React.FC<AudioControlsProps> = ({
   onStopRecording,
   onPlay,
   onPausePlayback,
+  onStopPlayback,
   onReset
 }) => {
   const getRecordButtonContent = () => {
@@ -94,6 +96,17 @@ export const AudioControls: React.FC<AudioControlsProps> = ({
     }
   };
 
+  const handleStopClick = () => {
+    // Stop recording if active
+    if (recordingState === 'recording' || recordingState === 'paused') {
+      onStopRecording();
+    }
+    // Stop playback if active
+    if (playbackState === 'playing' || playbackState === 'paused') {
+      onStopPlayback();
+    }
+  };
+
   const isRecordingActive = recordingState === 'recording' || recordingState === 'paused';
   const canPlay = hasRecording && !isRecordingActive;
 
@@ -119,8 +132,8 @@ export const AudioControls: React.FC<AudioControlsProps> = ({
 
       {/* Stop Button */}
       <button
-        onClick={onStopRecording}
-        disabled={recordingState === 'idle'}
+        onClick={handleStopClick}
+        disabled={recordingState === 'idle' && playbackState !== 'playing' && playbackState !== 'paused'}
         className="
           flex items-center space-x-2 px-6 py-3 rounded-full font-medium transition-all duration-200
           bg-gray-500 hover:bg-gray-600 text-white shadow-lg hover:shadow-xl
