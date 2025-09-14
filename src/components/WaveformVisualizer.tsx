@@ -35,7 +35,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   const animationFrameRef = useRef<number | undefined>(undefined);
   const [waveformData, setWaveformData] = useState<number[]>([]);
   const [isRecordingComplete, setIsRecordingComplete] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<string>('');
   const [playbackStartTime, setPlaybackStartTime] = useState<number | null>(null);
 
   const width = 1200;
@@ -62,10 +61,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       const amplitude = 0.4 + wave1 + wave2 + wave3 + randomVariation;
       const result = Math.max(0.1, Math.min(0.9, amplitude));
       
-      // Update debug info
-      if (Math.random() < 0.02) {
-        setDebugInfo(`SIMPLE - Elapsed: ${elapsedSeconds.toFixed(1)}s, Amp: ${result.toFixed(3)}, State: ${playbackState}`);
-      }
       
       return result;
     } else {
@@ -123,9 +118,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         freqSum += freqDataArray[i];
       }
 
-      if (Math.random() < 0.01) { // Debug log occasionally
-        setDebugInfo(`Time: ${timeVariance.toFixed(3)}, Freq: ${freqSum.toFixed(1)}, Context: ${audioContext.state}, State: ${playbackState}`);
-      }
 
       if (!hasValidTimeData && !hasValidFreqData) {
         console.warn('No valid audio data from analyser - both time and frequency data are flat');
@@ -443,12 +435,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         )}
       </div>
       
-      {/* Debug Info */}
-      {debugInfo && (
-        <div className="text-xs text-gray-500 text-center mt-2">
-          Debug: {debugInfo}
-        </div>
-      )}
     </div>
   );
 };

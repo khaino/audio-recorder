@@ -34,61 +34,96 @@ export const useAudioEnhancement = () => {
   const createProcessingChain = useCallback((audioContext: AudioContext, source: AudioBufferSourceNode) => {
     const chain: AudioNode[] = [source];
     
-    // 1. Noise Reduction - Remove background and non-voice frequencies
+    // 1. Initial cleanup filters
     const highpass = audioContext.createBiquadFilter();
     highpass.type = 'highpass';
-    highpass.frequency.setValueAtTime(85, audioContext.currentTime); // Remove low rumble
+    highpass.frequency.setValueAtTime(85, audioContext.currentTime);
     highpass.Q.setValueAtTime(0.7, audioContext.currentTime);
     chain.push(highpass);
     
     const lowpass = audioContext.createBiquadFilter();
     lowpass.type = 'lowpass';
-    lowpass.frequency.setValueAtTime(8000, audioContext.currentTime); // Remove high-frequency noise
+    lowpass.frequency.setValueAtTime(8000, audioContext.currentTime);
     lowpass.Q.setValueAtTime(0.7, audioContext.currentTime);
     chain.push(lowpass);
 
-    // 2. Remove Sharp Voice - De-esser to reduce harsh sibilants
+    // 2. De-esser (gentle)
     const deEsser = audioContext.createBiquadFilter();
     deEsser.type = 'peaking';
-    deEsser.frequency.setValueAtTime(6500, audioContext.currentTime); // Target sibilant frequencies
-    deEsser.Q.setValueAtTime(3, audioContext.currentTime);
-    deEsser.gain.setValueAtTime(-4, audioContext.currentTime); // Reduce harshness
+    deEsser.frequency.setValueAtTime(6500, audioContext.currentTime);
+    deEsser.Q.setValueAtTime(2, audioContext.currentTime);
+    deEsser.gain.setValueAtTime(-2, audioContext.currentTime);
     chain.push(deEsser);
 
-    // 3. Voice Optimization - Enhance vocal clarity and presence
+    // 3. AGGRESSIVE VOICE-OPTIMIZED COMPRESSOR (replaces multi-band)
+    const voiceCompressor = audioContext.createDynamicsCompressor();
+    voiceCompressor.threshold.setValueAtTime(-18, audioContext.currentTime); // Lower threshold for more compression
+    voiceCompressor.knee.setValueAtTime(8, audioContext.currentTime); // Soft knee
+    voiceCompressor.ratio.setValueAtTime(6, audioContext.currentTime); // Aggressive compression for loudness
+    voiceCompressor.attack.setValueAtTime(0.003, audioContext.currentTime); // Very fast attack
+    voiceCompressor.release.setValueAtTime(0.1, audioContext.currentTime); // Quick release
+    chain.push(voiceCompressor);
+    
+    // 4. Voice Enhancement EQ - Multiple bands for maximum impact
+    const lowMidBoost = audioContext.createBiquadFilter();
+    lowMidBoost.type = 'peaking';
+    lowMidBoost.frequency.setValueAtTime(800, audioContext.currentTime); // Body/warmth
+    lowMidBoost.Q.setValueAtTime(1, audioContext.currentTime);
+    lowMidBoost.gain.setValueAtTime(2, audioContext.currentTime);
+    chain.push(lowMidBoost);
+    
     const voiceClarity = audioContext.createBiquadFilter();
     voiceClarity.type = 'peaking';
-    voiceClarity.frequency.setValueAtTime(2800, audioContext.currentTime); // Voice clarity frequency
+    voiceClarity.frequency.setValueAtTime(2800, audioContext.currentTime); // Voice clarity
     voiceClarity.Q.setValueAtTime(1.2, audioContext.currentTime);
-    voiceClarity.gain.setValueAtTime(3, audioContext.currentTime); // Boost presence
+    voiceClarity.gain.setValueAtTime(5, audioContext.currentTime); // Strong boost
     chain.push(voiceClarity);
-
-    // 4. Warm Tone - Add warmth to the voice
+    
+    const presence = audioContext.createBiquadFilter();
+    presence.type = 'peaking';
+    presence.frequency.setValueAtTime(4500, audioContext.currentTime); // Presence
+    presence.Q.setValueAtTime(1.5, audioContext.currentTime);
+    presence.gain.setValueAtTime(3, audioContext.currentTime);
+    chain.push(presence);
+    
+    // 5. Warm Tone
     const warmth = audioContext.createBiquadFilter();
     warmth.type = 'lowshelf';
-    warmth.frequency.setValueAtTime(400, audioContext.currentTime);
-    warmth.gain.setValueAtTime(1.5, audioContext.currentTime); // Add warmth without muddiness
+    warmth.frequency.setValueAtTime(300, audioContext.currentTime);
+    warmth.gain.setValueAtTime(2.5, audioContext.currentTime); // More warmth
     chain.push(warmth);
-
-    // 5. Smooth Voice - Gentle compression for smoothness
-    const smoothCompressor = audioContext.createDynamicsCompressor();
-    smoothCompressor.threshold.setValueAtTime(-24, audioContext.currentTime); // Gentle threshold
-    smoothCompressor.knee.setValueAtTime(6, audioContext.currentTime); // Soft knee
-    smoothCompressor.ratio.setValueAtTime(3, audioContext.currentTime); // Light compression
-    smoothCompressor.attack.setValueAtTime(0.01, audioContext.currentTime); // Quick attack
-    smoothCompressor.release.setValueAtTime(0.25, audioContext.currentTime); // Smooth release
-    chain.push(smoothCompressor);
-
-    // 6. Final Noise Gate - Remove background noise during quiet moments
+    
+    // 6. High-frequency air
+    const airFilter = audioContext.createBiquadFilter();
+    airFilter.type = 'highshelf';
+    airFilter.frequency.setValueAtTime(6000, audioContext.currentTime);
+    airFilter.gain.setValueAtTime(2.5, audioContext.currentTime); // More presence
+    chain.push(airFilter);
+    
+    // 7. Gentle noise gate
     const noiseGate = audioContext.createDynamicsCompressor();
-    noiseGate.threshold.setValueAtTime(-45, audioContext.currentTime); // Gate threshold
-    noiseGate.knee.setValueAtTime(2, audioContext.currentTime);
-    noiseGate.ratio.setValueAtTime(10, audioContext.currentTime); // Strong gating
-    noiseGate.attack.setValueAtTime(0.002, audioContext.currentTime);
-    noiseGate.release.setValueAtTime(0.1, audioContext.currentTime);
+    noiseGate.threshold.setValueAtTime(-32, audioContext.currentTime); // Less aggressive
+    noiseGate.knee.setValueAtTime(6, audioContext.currentTime);
+    noiseGate.ratio.setValueAtTime(3, audioContext.currentTime); // Gentler
+    noiseGate.attack.setValueAtTime(0.01, audioContext.currentTime);
+    noiseGate.release.setValueAtTime(0.2, audioContext.currentTime);
     chain.push(noiseGate);
-
-    // Connect the chain
+    
+    // 8. MASSIVE makeup gain for loudness
+    const makeupGain = audioContext.createGain();
+    makeupGain.gain.setValueAtTime(4.5, audioContext.currentTime); // +13dB boost (4.5x = ~13dB)
+    chain.push(makeupGain);
+    
+    // 9. Safety limiter
+    const finalLimiter = audioContext.createDynamicsCompressor();
+    finalLimiter.threshold.setValueAtTime(-0.5, audioContext.currentTime); // Prevent clipping
+    finalLimiter.knee.setValueAtTime(0, audioContext.currentTime); // Hard knee
+    finalLimiter.ratio.setValueAtTime(20, audioContext.currentTime); // Hard limiting
+    finalLimiter.attack.setValueAtTime(0.001, audioContext.currentTime);
+    finalLimiter.release.setValueAtTime(0.03, audioContext.currentTime);
+    chain.push(finalLimiter);
+    
+    // Connect the chain serially (much simpler and reliable)
     for (let i = 0; i < chain.length - 1; i++) {
       chain[i].connect(chain[i + 1]);
     }

@@ -178,18 +178,8 @@ function App() {
             </div>
           )}
 
-          {/* Recording Info */}
-          {hasRecording && (
-            <div className="text-center text-sm text-gray-500 pt-4">
-              Recording duration: {Math.floor((recorderData.duration || 0) / 60)}:{Math.floor((recorderData.duration || 0) % 60).toString().padStart(2, '0')}
-            </div>
-          )}
         </div>
 
-        {/* Footer */}
-        <div className="text-center mt-8 text-gray-500 text-sm">
-          <p>Built with React, TypeScript, and Tailwind CSS</p>
-        </div>
       </div>
     </div>
   );

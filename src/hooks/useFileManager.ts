@@ -57,11 +57,24 @@ export const useFileManager = () => {
     writeString(36, 'data');
     view.setUint32(40, dataSize, true);
 
-    // Convert audio data
+    // VOLUME NORMALIZATION - Find peak and normalize for consistent loudness
+    let maxPeak = 0;
+    for (let i = 0; i < length; i++) {
+      for (let channel = 0; channel < numberOfChannels; channel++) {
+        const sample = Math.abs(buffer.getChannelData(channel)[i]);
+        if (sample > maxPeak) maxPeak = sample;
+      }
+    }
+    
+    // Calculate normalization gain - target 95% of full scale
+    const targetPeak = 0.95;
+    const normalizationGain = maxPeak > 0 ? targetPeak / maxPeak : 1.0;
+    
+    // Convert audio data with normalization
     let offset = 44;
     for (let i = 0; i < length; i++) {
       for (let channel = 0; channel < numberOfChannels; channel++) {
-        const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i]));
+        const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i] * normalizationGain));
         view.setInt16(offset, sample * 0x7FFF, true);
         offset += 2;
       }
@@ -94,6 +107,23 @@ export const useFileManager = () => {
       const leftChannel = audioBuffer.getChannelData(0);
       const rightChannel = channels > 1 ? audioBuffer.getChannelData(1) : null;
       
+      // VOLUME NORMALIZATION - Find peak and normalize to maximize loudness
+      let maxPeak = 0;
+      for (let i = 0; i < totalSamples; i++) {
+        const leftSample = Math.abs(leftChannel[i]);
+        const rightSample = rightChannel ? Math.abs(rightChannel[i]) : 0;
+        const peak = Math.max(leftSample, rightSample);
+        if (peak > maxPeak) maxPeak = peak;
+      }
+      
+      // Calculate normalization gain - target 95% of full scale to prevent clipping
+      const targetPeak = 0.95;
+      const normalizationGain = maxPeak > 0 ? targetPeak / maxPeak : 1.0;
+      
+      // Apply additional loudness boost for MP3 format (compensate for psychoacoustic losses)
+      const mp3LoudnessBoost = 1.2; // +1.6dB boost for MP3
+      const finalGain = normalizationGain * mp3LoudnessBoost;
+      
       // Process audio in blocks
       for (let offset = 0; offset < totalSamples; offset += blockSize) {
         const currentBlockSize = Math.min(blockSize, totalSamples - offset);
@@ -107,12 +137,12 @@ export const useFileManager = () => {
           const sampleIndex = offset + i;
           
           if (sampleIndex < totalSamples) {
-            // Convert float32 [-1, 1] to int16 [-32768, 32767]
-            const leftSample = leftChannel[sampleIndex];
+            // Convert float32 [-1, 1] to int16 [-32768, 32767] with normalization
+            const leftSample = leftChannel[sampleIndex] * finalGain;
             leftBuffer[i] = Math.max(-32768, Math.min(32767, Math.round(leftSample * 32767)));
             
             if (rightBuffer && rightChannel) {
-              const rightSample = rightChannel[sampleIndex];
+              const rightSample = rightChannel[sampleIndex] * finalGain;
               rightBuffer[i] = Math.max(-32768, Math.min(32767, Math.round(rightSample * 32767)));
             }
           } else {
