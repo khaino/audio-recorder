@@ -109,9 +109,9 @@ export const useAudioEnhancement = () => {
     noiseGate.release.setValueAtTime(0.2, audioContext.currentTime);
     chain.push(noiseGate);
     
-    // 8. MASSIVE makeup gain for loudness
+    // 8. Professional makeup gain for balanced loudness
     const makeupGain = audioContext.createGain();
-    makeupGain.gain.setValueAtTime(4.5, audioContext.currentTime); // +13dB boost (4.5x = ~13dB)
+    makeupGain.gain.setValueAtTime(3.0, audioContext.currentTime); // +9.5dB boost (3.0x = ~9.5dB)
     chain.push(makeupGain);
     
     // 9. Safety limiter
