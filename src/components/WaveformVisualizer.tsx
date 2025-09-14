@@ -248,16 +248,30 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     const draw = () => {
       // Clear canvas
       ctx.clearRect(0, 0, width, height);
+      
+      // Enable high-quality rendering for smooth curves
+      ctx.imageSmoothingEnabled = true;
+      if ('imageSmoothingQuality' in ctx) {
+        ctx.imageSmoothingQuality = 'high';
+      }
+
+      // Helper function to draw a proper rounded rectangle
+      const drawRoundedRect = (x: number, y: number, w: number, h: number, radius: number) => {
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + w - radius, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+        ctx.lineTo(x + w, y + h - radius);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+        ctx.lineTo(x + radius, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+      };
 
       // Draw rounded rectangle background with dark, cool gradient
-      ctx.beginPath();
-      // Fallback for browsers that don't support roundRect
-      if (ctx.roundRect) {
-        ctx.roundRect(0, 0, width, height, cornerRadius);
-      } else {
-        // Draw regular rectangle as fallback
-        ctx.rect(0, 0, width, height);
-      }
+      drawRoundedRect(0, 0, width, height, cornerRadius);
       
       // Create dark gradient background
       const gradient = ctx.createLinearGradient(0, 0, 0, height);
@@ -272,7 +286,8 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       ctx.fillStyle = gradient;
       ctx.fill();
       
-      // Subtle border with cool color
+      // Subtle border with cool color - draw the rounded rect again for stroke
+      drawRoundedRect(0, 0, width, height, cornerRadius);
       ctx.strokeStyle = recordingState === 'recording' ? '#60a5fa' : '#4b5563';
       ctx.lineWidth = 2;
       ctx.stroke();
@@ -404,7 +419,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
           width={width}
           height={height}
           onClick={handleCanvasClick}
-          className="cursor-pointer shadow-lg"
+          className="cursor-pointer shadow-lg rounded-3xl"
           style={{ maxWidth: '100%', height: 'auto' }}
         />
       </div>
