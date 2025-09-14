@@ -8,26 +8,34 @@ import { useFileManager } from './hooks/useFileManager';
 
 function App() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  const [selectedFormat, setSelectedFormat] = useState<'mp3' | 'wav' | 'webm'>('mp3');
+  const [isConverting, setIsConverting] = useState(false);
   
   const { data: recorderData, actions: recorderActions } = useAudioRecorder(selectedDeviceId);
   const { data: playerData, actions: playerActions } = useAudioPlayer(recorderData.audioUrl);
-  const { downloadAudio, saveToLocalStorage } = useFileManager();
+  const { downloadAudio } = useFileManager();
 
   const handleDeviceChange = useCallback((deviceId: string) => {
     setSelectedDeviceId(deviceId);
   }, []);
 
-  const handleDownload = useCallback(() => {
-    if (recorderData.audioBlob) {
-      downloadAudio(recorderData.audioBlob);
+  const handleDownload = useCallback(async () => {
+    if (recorderData.audioBlob && !isConverting) {
+      setIsConverting(true);
+      try {
+        const filename = `recording_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.${selectedFormat}`;
+        await downloadAudio(recorderData.audioBlob, filename, selectedFormat);
+      } catch (error) {
+        console.error('Download failed:', error);
+      } finally {
+        setIsConverting(false);
+      }
     }
-  }, [recorderData.audioBlob, downloadAudio]);
+  }, [recorderData.audioBlob, downloadAudio, selectedFormat, isConverting]);
 
-  const handleSave = useCallback(() => {
-    if (recorderData.audioBlob) {
-      saveToLocalStorage(recorderData.audioBlob);
-    }
-  }, [recorderData.audioBlob, saveToLocalStorage]);
+  const handleFormatChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedFormat(event.target.value as 'mp3' | 'wav' | 'webm');
+  }, []);
 
   const hasRecording = recorderData.audioBlob !== null;
   
@@ -113,26 +121,65 @@ function App() {
 
           {/* File Management */}
           {hasRecording && (
-            <div className="flex justify-center space-x-4 pt-6 border-t border-gray-200">
+            <div className="flex flex-col items-center space-y-4 pt-6 border-t border-gray-200">
+              {/* Format Selection */}
+              <div className="flex items-center space-x-3">
+                <label htmlFor="format-select" className="text-sm font-medium text-gray-700">
+                  Format:
+                </label>
+                <select
+                  id="format-select"
+                  value={selectedFormat}
+                  onChange={handleFormatChange}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm font-medium"
+                >
+                  <option value="mp3">MP3</option>
+                  <option value="wav">WAV</option>
+                  <option value="webm">WebM</option>
+                </select>
+              </div>
+              
+              {/* Download Button */}
               <button
                 onClick={handleDownload}
-                className="flex items-center space-x-2 px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors duration-200"
+                disabled={isConverting}
+                className="flex items-center space-x-2 px-8 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors duration-200 shadow-lg"
               >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-                <span>Download</span>
+                {isConverting ? (
+                  <>
+                    <svg className="w-5 h-5 animate-spin" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                    </svg>
+                    <span>Converting...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                    <span>Download as {selectedFormat.toUpperCase()}</span>
+                  </>
+                )}
               </button>
               
-              <button
-                onClick={handleSave}
-                className="flex items-center space-x-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors duration-200"
-              >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" />
-                </svg>
-                <span>Save to Browser</span>
-              </button>
+              {/* Format Information */}
+              {selectedFormat === 'mp3' && (
+                <div className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                  <span className="font-medium">⚠</span> MP3 conversion is experimental. If playback fails, try WAV or WebM format.
+                </div>
+              )}
+              
+              {selectedFormat === 'wav' && (
+                <div className="text-xs text-green-600 bg-green-50 px-3 py-2 rounded-lg border border-green-200">
+                  <span className="font-medium">✓</span> WAV format provides uncompressed audio quality.
+                </div>
+              )}
+              
+              {selectedFormat === 'webm' && (
+                <div className="text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
+                  <span className="font-medium">ℹ</span> WebM is the original recorded format (smallest file size).
+                </div>
+              )}
             </div>
           )}
 
