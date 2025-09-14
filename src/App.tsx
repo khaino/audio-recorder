@@ -30,12 +30,35 @@ function App() {
   }, [recorderData.audioBlob, saveToLocalStorage]);
 
   const hasRecording = recorderData.audioBlob !== null;
-  const currentTime = recorderData.state === 'recording' || recorderData.state === 'paused' 
+  
+  // Current time logic: use recorder time when recording/paused, player time during playback
+  const currentTime = (recorderData.state === 'recording' || recorderData.state === 'paused') 
     ? recorderData.currentTime 
     : playerData.currentTime;
-  const duration = recorderData.state === 'recording' || recorderData.state === 'paused'
-    ? recorderData.currentTime
-    : (recorderData.duration > 0 ? recorderData.duration : playerData.duration);
+  
+  // Duration logic: 
+  // - During recording: use current recording time as duration (it grows as we record)
+  // - After recording/playback: always show the total recorded duration
+  const duration = (recorderData.state === 'recording' || recorderData.state === 'paused')
+    ? recorderData.currentTime  // Duration grows with recording time
+    : recorderData.duration > 0 ? recorderData.duration : 0;  // Use recorded duration, fallback to 0
+  
+  // Enhanced debug logging
+  if (recorderData.state === 'recording') {
+    console.log('🔴 RECORDING - currentTime:', recorderData.currentTime, 'duration passed to visualizer:', duration);
+  }
+
+  // Debug logging for timestamp issues
+  console.log('App.tsx time values:', {
+    recorderState: recorderData.state,
+    playerState: playerData.state,
+    recorderCurrentTime: recorderData.currentTime,
+    recorderDuration: recorderData.duration,
+    playerCurrentTime: playerData.currentTime,
+    playerDuration: playerData.duration,
+    calculatedCurrentTime: currentTime,
+    calculatedDuration: duration
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">

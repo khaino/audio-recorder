@@ -21,6 +21,28 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   analyser,
   onSeek
 }) => {
+  const formatTime = (time: number) => {
+    // Handle null, undefined, NaN, or negative values
+    if (time == null || !isFinite(time) || time < 0) {
+      return '0:00';
+    }
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // Debug logging for timestamp issues
+  useEffect(() => {
+    console.log('=== WaveformVisualizer Debug ===');
+    console.log('Recording State:', recordingState);
+    console.log('Playback State:', playbackState);
+    console.log('Raw currentTime:', currentTime, typeof currentTime);
+    console.log('Raw duration:', duration, typeof duration);
+    console.log('Formatted currentTime:', formatTime(currentTime));
+    console.log('Formatted duration:', formatTime(duration));
+    console.log('formatTime(5):', formatTime(5)); // Test the function
+    console.log('================================');
+  }, [recordingState, playbackState, currentTime, duration, formatTime]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | undefined>(undefined);
   const [waveformData, setWaveformData] = useState<number[]>([]);
@@ -340,15 +362,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     onSeek(seekTime);
   };
 
-  const formatTime = (time: number) => {
-    if (!time || !isFinite(time)) {
-      return '0:00';
-    }
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
-
   return (
     <div className="flex flex-col items-center space-y-4">
       <div className="relative">
@@ -363,7 +376,16 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       </div>
       
       <div className="flex justify-between items-center w-full max-w-[800px] text-sm text-gray-600">
-        <span>{formatTime(currentTime)}</span>
+        {/* Left timestamp - only show during playback */}
+        {(playbackState === 'playing' || playbackState === 'paused') && (
+          <span>{formatTime(currentTime)}</span>
+        )}
+        
+        {/* Spacer for when left timestamp is hidden */}
+        {!(playbackState === 'playing' || playbackState === 'paused') && (
+          <span></span>
+        )}
+        
         <div className="flex items-center space-x-2">
           {recordingState === 'recording' && (
             <div className="flex items-center space-x-2">
@@ -384,7 +406,18 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
             </div>
           )}
         </div>
-        <span>{formatTime(duration)}</span>
+        
+        {/* Right timestamp - show during recording (growing) or after recording (total) */}
+        {(recordingState === 'recording' || recordingState === 'paused' || 
+          (recordingState === 'stopped' || recordingState === 'idle') && duration > 0) && (
+          <span>{formatTime(duration)}</span>
+        )}
+        
+        {/* Spacer for when right timestamp is hidden */}
+        {!(recordingState === 'recording' || recordingState === 'paused' || 
+          (recordingState === 'stopped' || recordingState === 'idle') && duration > 0) && (
+          <span></span>
+        )}
       </div>
       
       {/* Debug Info */}

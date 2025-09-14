@@ -37,15 +37,20 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
 
   const updateTimer = useCallback(() => {
-    if (state === 'recording') {
-      const elapsed = Date.now() - startTimeRef.current;
-      setCurrentTime(elapsed / 1000);
-    }
-  }, [state]);
+    const elapsed = Date.now() - startTimeRef.current;
+    const elapsedSeconds = elapsed / 1000;
+    console.log('Timer update - elapsed:', elapsed, 'ms, seconds:', elapsedSeconds, 'startTime:', startTimeRef.current);
+    setCurrentTime(elapsedSeconds);
+  }, []);
 
   const startTimer = useCallback(() => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (intervalRef.current) {
+      console.log('Clearing existing timer');
+      clearInterval(intervalRef.current);
+    }
+    console.log('Setting up new timer with 100ms interval');
     intervalRef.current = window.setInterval(updateTimer, 100);
+    console.log('Timer started with ID:', intervalRef.current);
   }, [updateTimer]);
 
   const stopTimer = useCallback(() => {
@@ -152,7 +157,9 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
         console.log('Created blob with size:', blob.size, 'bytes, type:', blob.type);
         setAudioBlob(blob);
         setAudioUrl(URL.createObjectURL(blob));
-        setDuration(currentTime);
+        
+        // Duration is already set in stopRecording function
+        console.log('Recording blob created, duration should already be set');
         
         // Clean up stream and audio context
         if (streamRef.current) {
@@ -180,11 +187,12 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
       startTimeRef.current = Date.now();
       pausedTimeRef.current = 0;
       setCurrentTime(0);
-      // Start recording with a timeslice of 1000ms to ensure continuous recording
+      console.log('Starting new recording at time:', startTimeRef.current);
       console.log('Starting new recording with timeslice 1000ms');
       mediaRecorder.start(1000);
       
       setState('recording');
+      console.log('Starting timer...');
       startTimer();
     } catch (error) {
       console.error('Error starting recording:', error);
@@ -203,9 +211,17 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && (state === 'recording' || state === 'paused')) {
+      // Capture the final recording duration before stopping
+      const finalDuration = (Date.now() - startTimeRef.current) / 1000;
+      console.log('Stopping recording with duration:', finalDuration, 'seconds');
+      
       mediaRecorderRef.current.stop();
       setState('stopped');
       stopTimer();
+      
+      // Set the final duration
+      setDuration(finalDuration);
+      setCurrentTime(finalDuration);
     }
   }, [state, stopTimer]);
 
