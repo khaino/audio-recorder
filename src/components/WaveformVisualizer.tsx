@@ -31,18 +31,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // Debug logging for timestamp issues
-  useEffect(() => {
-    console.log('=== WaveformVisualizer Debug ===');
-    console.log('Recording State:', recordingState);
-    console.log('Playback State:', playbackState);
-    console.log('Raw currentTime:', currentTime, typeof currentTime);
-    console.log('Raw duration:', duration, typeof duration);
-    console.log('Formatted currentTime:', formatTime(currentTime));
-    console.log('Formatted duration:', formatTime(duration));
-    console.log('formatTime(5):', formatTime(5)); // Test the function
-    console.log('================================');
-  }, [recordingState, playbackState, currentTime, duration, formatTime]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | undefined>(undefined);
   const [waveformData, setWaveformData] = useState<number[]>([]);
@@ -97,7 +85,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       // Try to resume if suspended
       if (audioContext.state === 'suspended') {
         audioContext.resume().then(() => {
-          console.log('Audio context resumed');
         }).catch((err: any) => {
           console.error('Failed to resume audio context:', err);
         });
@@ -114,14 +101,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       analyser.getByteTimeDomainData(timeDataArray);
       analyser.getByteFrequencyData(freqDataArray);
 
-      // Debug: Log first few samples occasionally
-      if (Math.random() < 0.02) { // Log 2% of the time for more debugging
-        console.log('Time domain samples:', timeDataArray.slice(0, 10));
-        console.log('Frequency samples:', freqDataArray.slice(0, 10));
-        console.log('Audio context state:', audioContext.state);
-        console.log('Analyser connected:', analyser ? 'Yes' : 'No');
-        console.log('Buffer length:', bufferLength, 'Freq bins:', freqDataArray.length);
-      }
 
       // Check if we're getting valid time domain data
       let hasValidTimeData = false;
@@ -145,9 +124,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       }
 
       if (Math.random() < 0.01) { // Debug log occasionally
-        console.log('Time variance:', timeVariance, 'Freq sum:', freqSum);
-        console.log('Has valid time data:', hasValidTimeData, 'Has valid freq data:', hasValidFreqData);
-        console.log('Playback state:', playbackState, 'Recording state:', recordingState);
         setDebugInfo(`Time: ${timeVariance.toFixed(3)}, Freq: ${freqSum.toFixed(1)}, Context: ${audioContext.state}, State: ${playbackState}`);
       }
 
@@ -183,7 +159,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       const interval = setInterval(() => {
         // Periodic check to ensure audio context is still running
         if (audioContext && audioContext.state === 'suspended') {
-          console.log('Attempting to resume suspended audio context during recording');
           audioContext.resume().catch((err: any) => {
             console.error('Failed to resume audio context during recording:', err);
           });
@@ -210,7 +185,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       const interval = setInterval(() => {
         // Periodic check to ensure audio context is still running
         if (audioContext && audioContext.state === 'suspended') {
-          console.log('Attempting to resume suspended audio context during playback');
           audioContext.resume().catch((err: any) => {
             console.error('Failed to resume audio context during playback:', err);
           });

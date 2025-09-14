@@ -189,7 +189,7 @@ export const AudioControls: React.FC<AudioControlsProps> = ({
               {/* Stop Button */}
               <button
                 onClick={handleStopClick}
-                disabled={playbackState !== 'playing' && playbackState !== 'paused'}
+                disabled={playbackState === 'idle' && recordingState === 'idle'}
                 className="
                   flex items-center space-x-2 px-6 py-3 rounded-full font-medium transition-all duration-200
                   bg-gray-500 hover:bg-gray-600 text-white shadow-lg hover:shadow-xl
@@ -239,7 +239,7 @@ export const AudioControls: React.FC<AudioControlsProps> = ({
                 {/* Stop Button */}
                 <button
                   onClick={handleStopClick}
-                  disabled={playbackState !== 'playing' && playbackState !== 'paused'}
+                  disabled={playbackState === 'idle' && recordingState === 'idle'}
                   className="
                     flex items-center space-x-2 px-6 py-3 rounded-full font-medium transition-all duration-200
                     bg-gray-500 hover:bg-gray-600 text-white shadow-lg hover:shadow-xl

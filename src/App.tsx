@@ -5,14 +5,18 @@ import { WaveformVisualizer } from './components/WaveformVisualizer';
 import { useAudioRecorder } from './hooks/useAudioRecorder';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { useFileManager } from './hooks/useFileManager';
+import { useAudioEnhancement } from './hooks/useAudioEnhancement';
 
 function App() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [selectedFormat, setSelectedFormat] = useState<'mp3' | 'wav' | 'webm'>('mp3');
   const [isConverting, setIsConverting] = useState(false);
   
+  // Audio enhancement hook
+  const { data: enhancementData, actions: enhancementActions } = useAudioEnhancement();
+  
   const { data: recorderData, actions: recorderActions } = useAudioRecorder(selectedDeviceId);
-  const { data: playerData, actions: playerActions } = useAudioPlayer(recorderData.audioUrl);
+  const { data: playerData, actions: playerActions } = useAudioPlayer(recorderData.audioUrl, true); // Enable auto-enhancement
   const { downloadAudio } = useFileManager();
 
   const handleDeviceChange = useCallback((deviceId: string) => {
@@ -24,14 +28,19 @@ function App() {
       setIsConverting(true);
       try {
         const filename = `recording_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.${selectedFormat}`;
-        await downloadAudio(recorderData.audioBlob, filename, selectedFormat);
+        await downloadAudio(
+          recorderData.audioBlob, 
+          filename, 
+          selectedFormat,
+          enhancementActions.processBuffer // Apply current enhancement settings
+        );
       } catch (error) {
         console.error('Download failed:', error);
       } finally {
         setIsConverting(false);
       }
     }
-  }, [recorderData.audioBlob, downloadAudio, selectedFormat, isConverting]);
+  }, [recorderData.audioBlob, downloadAudio, selectedFormat, isConverting, enhancementActions.processBuffer]);
 
   const handleFormatChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedFormat(event.target.value as 'mp3' | 'wav' | 'webm');
@@ -51,22 +60,7 @@ function App() {
     ? recorderData.currentTime  // Duration grows with recording time
     : recorderData.duration > 0 ? recorderData.duration : 0;  // Use recorded duration, fallback to 0
   
-  // Enhanced debug logging
-  if (recorderData.state === 'recording') {
-    console.log('🔴 RECORDING - currentTime:', recorderData.currentTime, 'duration passed to visualizer:', duration);
-  }
 
-  // Debug logging for timestamp issues
-  console.log('App.tsx time values:', {
-    recorderState: recorderData.state,
-    playerState: playerData.state,
-    recorderCurrentTime: recorderData.currentTime,
-    recorderDuration: recorderData.duration,
-    playerCurrentTime: playerData.currentTime,
-    playerDuration: playerData.duration,
-    calculatedCurrentTime: currentTime,
-    calculatedDuration: duration
-  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
@@ -77,7 +71,7 @@ function App() {
             Audio Recorder
           </h1>
           <p className="text-lg text-gray-600">
-            Record, visualize, and playback high-quality audio
+            Record, enhance, and playback professional-quality audio
           </p>
         </div>
 
@@ -89,6 +83,7 @@ function App() {
               <AudioInputSelector onDeviceChange={handleDeviceChange} />
             </div>
           </div>
+
 
           {/* Waveform Visualizer */}
           <div className="flex justify-center">
@@ -157,6 +152,11 @@ function App() {
                 </select>
               </div>
               
+              {/* Enhancement Status */}
+              <div className="text-xs text-purple-600 bg-purple-50 px-3 py-2 rounded-lg border border-purple-200">
+                <span className="font-medium">🎛️</span> Audio automatically enhanced with noise reduction, voice optimization, and warm tone
+              </div>
+
               {/* Format Information */}
               {selectedFormat === 'mp3' && (
                 <div className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">

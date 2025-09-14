@@ -77,13 +77,6 @@ export const useFileManager = () => {
       const audioContext = new AudioContext();
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
       
-      console.log('MP3 Conversion - Audio buffer info:', {
-        channels: audioBuffer.numberOfChannels,
-        sampleRate: audioBuffer.sampleRate,
-        length: audioBuffer.length,
-        duration: audioBuffer.duration
-      });
-      
       const channels = audioBuffer.numberOfChannels;
       const sampleRate = audioBuffer.sampleRate;
       const kbps = 128;
@@ -96,7 +89,6 @@ export const useFileManager = () => {
       const blockSize = 1152;
       const totalSamples = audioBuffer.length;
       
-      console.log('Starting MP3 encoding...');
       
       // Get audio data
       const leftChannel = audioBuffer.getChannelData(0);
@@ -153,7 +145,6 @@ export const useFileManager = () => {
       
       // Combine all MP3 data
       const totalLength = mp3Data.reduce((sum, chunk) => sum + chunk.length, 0);
-      console.log('MP3 encoding complete. Total size:', totalLength, 'bytes');
       
       if (totalLength === 0) {
         throw new Error('No MP3 data generated');
@@ -176,17 +167,58 @@ export const useFileManager = () => {
     }
   }, []);
 
-  const downloadAudio = useCallback(async (audioBlob: Blob, filename?: string, format?: 'mp3' | 'wav' | 'webm') => {
+  const downloadAudio = useCallback(async (
+    audioBlob: Blob, 
+    filename?: string, 
+    format?: 'mp3' | 'wav' | 'webm',
+    processBuffer?: (audioBuffer: AudioBuffer, audioContext: AudioContext) => { source: AudioBufferSourceNode, output: AudioNode }
+  ) => {
     let processedBlob = audioBlob;
     let defaultFilename = `recording_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}`;
     
-    // Convert audio if needed
-    if (format === 'wav') {
-      console.log('Converting to WAV format...');
+    // Apply audio processing if provided
+    if (processBuffer) {
+      try {
+        const arrayBuffer = await audioBlob.arrayBuffer();
+        const audioContext = new AudioContext();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        
+        // Create processed audio buffer using offline rendering
+        const offlineContext = new OfflineAudioContext(
+          audioBuffer.numberOfChannels,
+          audioBuffer.length,
+          audioBuffer.sampleRate
+        );
+        
+        // Get processed source and output
+        const { source: processedSource, output: processedOutput } = processBuffer(audioBuffer, offlineContext);
+        
+        // Connect to destination for rendering
+        processedOutput.connect(offlineContext.destination);
+        
+        // Start and render
+        processedSource.start(0);
+        const renderedBuffer = await offlineContext.startRendering();
+        
+        // Convert enhanced buffer back to blob
+        const wavBuffer = audioBufferToWav(renderedBuffer);
+        processedBlob = new Blob([wavBuffer], { type: 'audio/wav' });
+        
+        await audioContext.close();
+      } catch (error) {
+        console.error('Error applying enhancement to download:', error);
+        // Continue with original blob if processing fails
+      }
+    }
+    
+    // Convert audio if needed (unless already processed above)
+    if (format === 'wav' && !processBuffer) {
       processedBlob = await convertToWAV(audioBlob);
       filename = filename || `${defaultFilename}.wav`;
+    } else if (format === 'wav' && processBuffer) {
+      // Already processed to WAV above
+      filename = filename || `${defaultFilename}.wav`;
     } else if (format === 'mp3') {
-      console.log('Converting to MP3 format...');
       processedBlob = await convertToMP3(audioBlob);
       filename = filename || `${defaultFilename}.mp3`;
     } else {
