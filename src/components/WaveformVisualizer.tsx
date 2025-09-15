@@ -30,11 +30,12 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   const formatTime = (time: number) => {
     // Handle null, undefined, NaN, or negative values
     if (time == null || !isFinite(time) || time < 0) {
-      return '0:00';
+      return '0:00:0';
     }
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    const tenths = Math.floor((time % 1) * 10);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}:${tenths}`;
   };
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
