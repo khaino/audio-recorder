@@ -3,10 +3,12 @@ import { useAudioDevices } from '../hooks/useAudioDevices';
 
 interface AudioInputSelectorProps {
   onDeviceChange?: (deviceId: string) => void;
+  disabled?: boolean;
 }
 
 export const AudioInputSelector: React.FC<AudioInputSelectorProps> = ({ 
-  onDeviceChange 
+  onDeviceChange,
+  disabled = false
 }) => {
   const { devices, selectedDeviceId, setSelectedDeviceId, loading, error } = useAudioDevices();
 
@@ -44,7 +46,12 @@ export const AudioInputSelector: React.FC<AudioInputSelectorProps> = ({
         id="audio-input-select"
         value={selectedDeviceId}
         onChange={(e) => handleDeviceChange(e.target.value)}
-        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm font-medium text-gray-900 flex-1"
+        disabled={disabled}
+        className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-medium flex-1 ${
+          disabled 
+            ? 'bg-gray-100 text-gray-500 cursor-not-allowed' 
+            : 'bg-white text-gray-900'
+        }`}
       >
         {devices.map((device) => (
           <option key={device.deviceId} value={device.deviceId}>

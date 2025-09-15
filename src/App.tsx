@@ -84,20 +84,28 @@ function App() {
         <div className="bg-white rounded-2xl shadow-xl p-8 space-y-8">
           {/* Top Controls Row */}
           <div className="flex justify-between items-center">
-            {/* Left: Audio Input Device - Only show when no recording exists */}
+            {/* Left: Audio Input Device - Only show when no recording exists, disable during recording */}
             {!hasRecording && (
               <div className="w-64">
-                <AudioInputSelector onDeviceChange={handleDeviceChange} />
+                <AudioInputSelector 
+                  onDeviceChange={handleDeviceChange}
+                  disabled={recorderData.state === 'countdown' || recorderData.state === 'recording' || recorderData.state === 'paused'}
+                />
               </div>
             )}
             
-            {/* Right: Volume Control */}
+            {/* Right: Volume Control - Disable during recording and playback */}
             <div className={`flex items-center space-x-3 ${hasRecording ? 'ml-auto' : ''}`}>
               <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Volume</label>
               <select
                 value={selectedVolume}
                 onChange={handleVolumeChange}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm font-medium text-gray-900 w-32"
+                disabled={recorderData.state === 'countdown' || recorderData.state === 'recording' || recorderData.state === 'paused' || playerData.state === 'playing'}
+                className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-medium w-32 ${
+                  (recorderData.state === 'countdown' || recorderData.state === 'recording' || recorderData.state === 'paused' || playerData.state === 'playing')
+                    ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                    : 'bg-white text-gray-900'
+                }`}
               >
                 <option value="low">Low</option>
                 <option value="standard">Standard</option>
