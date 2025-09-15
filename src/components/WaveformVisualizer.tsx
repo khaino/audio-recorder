@@ -105,10 +105,10 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       // Audio analysis is working correctly
       
       // Calibrated amplitude scaling for proper dynamic range
-      // Target: RMS 0.005 → ~40% height, RMS 0.01 → ~60% height, RMS 0.02+ → 80%+ height
+      // Target: RMS 0.005 → ~8% height, RMS 0.01 → ~12% height, RMS 0.02+ → ~20% height
       
-      // Conservative scaling that preserves dynamic range
-      const normalized = rms * 40; // Conservative amplification
+      // Minimal amplification (10% of original)
+      const normalized = rms * 4; // Reduced from 40 to 4 (10% of original)
       const responsive = Math.pow(normalized, 0.6); // Power scaling (between sqrt and linear)
       
       // Gentle final scaling
