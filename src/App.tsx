@@ -122,8 +122,16 @@ function App() {
               playbackState={playerData.state}
               currentTime={currentTime}
               duration={duration}
-              audioContext={recorderData.audioContext || playerData.audioContext}
-              analyser={recorderData.analyser || playerData.analyser}
+              audioContext={
+                (recorderData.state === 'recording' || recorderData.state === 'paused') 
+                  ? recorderData.audioContext 
+                  : playerData.audioContext
+              }
+              analyser={
+                (recorderData.state === 'recording' || recorderData.state === 'paused') 
+                  ? recorderData.analyser 
+                  : playerData.analyser
+              }
               onSeek={playerActions.seek}
               countdownValue={recorderData.countdownValue}
             />

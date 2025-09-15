@@ -199,8 +199,10 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
           sourceRef.current = null;
         }
         
+        // Don't close the audio context immediately - let it be cleaned up later
+        // This prevents interference with the audio player
         if (audioContext) {
-          audioContext.close();
+          // Just disconnect and clear references, but don't close the context
           setAudioContext(null);
           setAnalyser(null);
         }
@@ -264,7 +266,7 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
     }
     
     if (audioContext) {
-      audioContext.close();
+      // Don't close the audio context aggressively
       setAudioContext(null);
       setAnalyser(null);
     }

@@ -45,35 +45,18 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
 
   // Function to get real audio amplitude from analyser
   const getRealAudioAmplitude = (): number => {
-    // For playback, use simple time-based simulation
+    // For playback, we need to get real amplitude from the audio player's analyser
+    // This will be handled by the audio player hook's analyser
     if (playbackState === 'playing') {
-      if (!playbackStartTime) {
-        setPlaybackStartTime(Date.now());
-      }
-      
-      // Calculate elapsed time since playback started
-      const elapsedSeconds = playbackStartTime ? (Date.now() - playbackStartTime) / 1000 : 0;
-      
-      // Simple but effective waveform simulation
-      const wave1 = Math.sin(elapsedSeconds * 2) * 0.3;
-      const wave2 = Math.sin(elapsedSeconds * 3.7) * 0.2;
-      const wave3 = Math.sin(elapsedSeconds * 0.8) * 0.25;
-      const randomVariation = (Math.random() - 0.5) * 0.1;
-      
-      const amplitude = 0.4 + wave1 + wave2 + wave3 + randomVariation;
-      const result = Math.max(0.1, Math.min(0.9, amplitude));
-      
-      
-      return result;
-    } else {
-      // Reset playback start time when not playing
+      // Reset playback start time tracking since we're using real audio analysis
       if (playbackStartTime) {
         setPlaybackStartTime(null);
       }
     }
 
     if (!analyser || !audioContext) {
-      return Math.random() * 0.8 + 0.1; // Fallback to random if no analyser
+      // Return a very low amplitude when no analyser available
+      return 0.05;
     }
 
     // Check if audio context is still running
@@ -86,62 +69,61 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
           console.error('Failed to resume audio context:', err);
         });
       }
-      return 0.1; // Return minimum amplitude
+      return 0.05; // Return minimum amplitude
     }
 
     try {
-      // Use both time domain and frequency data for better debugging
       const bufferLength = analyser.fftSize;
       const timeDataArray = new Uint8Array(bufferLength);
-      const freqDataArray = new Uint8Array(analyser.frequencyBinCount);
       
       analyser.getByteTimeDomainData(timeDataArray);
-      analyser.getByteFrequencyData(freqDataArray);
 
-
-      // Check if we're getting valid time domain data
-      let hasValidTimeData = false;
-      let timeVariance = 0;
+      // Calculate RMS (Root Mean Square) amplitude - this is the most accurate representation
+      let sum = 0;
+      let hasValidData = false;
+      
       for (let i = 0; i < bufferLength; i++) {
-        if (timeDataArray[i] !== 128) {
-          hasValidTimeData = true;
-        }
+        // Convert from 0-255 range to -1 to 1 range
         const sample = (timeDataArray[i] - 128) / 128;
-        timeVariance += Math.abs(sample);
-      }
-
-      // Check if we're getting valid frequency data
-      let hasValidFreqData = false;
-      let freqSum = 0;
-      for (let i = 0; i < freqDataArray.length; i++) {
-        if (freqDataArray[i] > 0) {
-          hasValidFreqData = true;
+        
+        // Check if we have actual audio data (not just silence at 128)
+        if (timeDataArray[i] !== 128) {
+          hasValidData = true;
         }
-        freqSum += freqDataArray[i];
+        
+        // Square the sample for RMS calculation
+        sum += sample * sample;
       }
 
-
-      if (!hasValidTimeData && !hasValidFreqData) {
-        console.warn('No valid audio data from analyser - both time and frequency data are flat');
-        return 0.1;
+      if (!hasValidData) {
+        return 0.05; // Return very low amplitude for silence
       }
 
-      // Use frequency data as it's often more reliable
-      if (hasValidFreqData) {
-        const average = freqSum / freqDataArray.length;
-        const normalized = average / 255;
-        const scaled = Math.min(normalized * 2, 1);
-        return Math.max(scaled * 0.9 + 0.1, 0.1);
-      }
-
-      // Fallback to time domain
-      const rmsVariance = timeVariance / bufferLength;
-      const scaled = Math.min(rmsVariance * 2, 1);
-      return Math.max(scaled * 0.9 + 0.1, 0.1);
+      // Calculate RMS amplitude
+      const rms = Math.sqrt(sum / bufferLength);
+      
+      // Audio analysis is working correctly
+      
+      // Calibrated amplitude scaling for proper dynamic range
+      // Target: RMS 0.005 → ~40% height, RMS 0.01 → ~60% height, RMS 0.02+ → 80%+ height
+      
+      // Conservative scaling that preserves dynamic range
+      const normalized = rms * 40; // Conservative amplification
+      const responsive = Math.pow(normalized, 0.6); // Power scaling (between sqrt and linear)
+      
+      // Gentle final scaling
+      const scaled = Math.min(responsive, 0.85);
+      
+      // Minimum threshold for any valid audio
+      const finalAmplitude = Math.max(scaled, hasValidData ? 0.08 : 0.05);
+      
+      // Amplitude scaling is working correctly
+      
+      return finalAmplitude;
 
     } catch (error) {
       console.error('Error getting audio amplitude:', error);
-      return 0.1;
+      return 0.05;
     }
   };
 

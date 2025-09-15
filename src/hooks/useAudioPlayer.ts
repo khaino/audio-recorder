@@ -28,10 +28,11 @@ export const useAudioPlayer = (
   const [duration, setDuration] = useState(0);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [, setIsProcessing] = useState(false);
   const [processedAudioUrl, setProcessedAudioUrl] = useState<string | null>(null);
   const [lastProcessedUrl, setLastProcessedUrl] = useState<string | null>(null);
   const [lastProcessedVolume, setLastProcessedVolume] = useState<'low' | 'standard' | 'high' | null>(null);
+  const [forceRecreation, setForceRecreation] = useState(0);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const intervalRef = useRef<number | null>(null);
@@ -273,14 +274,52 @@ export const useAudioPlayer = (
     return arrayBuffer;
   }, []);
 
-  // Commented out complex Web Audio API setup - using simple playback instead
-  /*
-  const setupAudioAnalysis = useCallback(async () => {
-    // ... complex setup code removed for reliability
-  }, [audioUrl, audioContext, stopTimer]);
-  */
+  // Setup audio analysis for real-time waveform during playback
+  const setupAudioAnalysis = useCallback(async (audioElement: HTMLAudioElement) => {
+    try {
+      // Create or reuse audio context
+      let audioCtx = audioContext;
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        setAudioContext(audioCtx);
+      }
+
+      // Ensure audio context is resumed
+      if (audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+      }
+
+      // Create media element source and analyser for this specific audio element
+      const source = audioCtx.createMediaElementSource(audioElement);
+      const analyserNode = audioCtx.createAnalyser();
+      
+      // Configure analyser for responsive waveform visualization
+      analyserNode.fftSize = 512;
+      analyserNode.smoothingTimeConstant = 0.3;
+      analyserNode.minDecibels = -90;
+      analyserNode.maxDecibels = -10;
+      
+      // Connect source -> analyser -> destination
+      source.connect(analyserNode);
+      analyserNode.connect(audioCtx.destination);
+      
+      // Store references
+      sourceRef.current = source;
+      setAnalyser(analyserNode);
+      
+    } catch (error) {
+      console.error('Failed to setup audio analysis:', error);
+      // Continue without analysis if it fails
+    }
+  }, [audioContext]);
 
   useEffect(() => {
+    // Skip if we already have the right audio element for this URL
+    // But don't skip if forceRecreation was triggered (after stop during playback)
+    if (audioRef.current && audioRef.current.src === audioUrl && audioRef.current.src !== '' && forceRecreation === 0) {
+      return;
+    }
+
     // Clean up any existing audio element first
     if (audioRef.current) {
       audioRef.current.pause();
@@ -288,6 +327,17 @@ export const useAudioPlayer = (
       audioRef.current.removeEventListener('ended', () => {});
       audioRef.current.removeEventListener('timeupdate', updateTime);
       audioRef.current = null;
+    }
+
+    // Clean up audio analysis from previous audio element
+    if (sourceRef.current) {
+      const currentSource = sourceRef.current;
+      currentSource.disconnect();
+      sourceRef.current = null;
+    }
+    if (audioContext) {
+      // Don't close the context, just reset the analyser
+      setAnalyser(null);
     }
 
     if (audioUrl) {
@@ -301,6 +351,8 @@ export const useAudioPlayer = (
           
           audio.addEventListener('loadedmetadata', () => {
             setDuration(audio.duration);
+            // Setup audio analysis once metadata is loaded
+            setTimeout(() => setupAudioAnalysis(audio), 100); // Small delay to ensure audio is ready
           });
           
           audio.addEventListener('ended', () => {
@@ -323,6 +375,8 @@ export const useAudioPlayer = (
             
             audio.addEventListener('loadedmetadata', () => {
               setDuration(audio.duration);
+              // Setup audio analysis once metadata is loaded
+              setTimeout(() => setupAudioAnalysis(audio), 100); // Small delay to ensure audio is ready
             });
             
             audio.addEventListener('ended', () => {
@@ -337,13 +391,15 @@ export const useAudioPlayer = (
             // Make sure any previous audio is cleaned up
             if (audioRef.current) {
               audioRef.current.pause();
-              audioRef.current = null;
             }
+            audioRef.current = null;
             const audio = new Audio(audioUrl);
             audioRef.current = audio;
             
             audio.addEventListener('loadedmetadata', () => {
               setDuration(audio.duration);
+              // Setup audio analysis once metadata is loaded
+              setTimeout(() => setupAudioAnalysis(audio), 100); // Small delay to ensure audio is ready
             });
             
             audio.addEventListener('ended', () => {
@@ -358,16 +414,13 @@ export const useAudioPlayer = (
         }
       } else {
         // Use original audio without processing
-        // Make sure any previous audio is cleaned up
-        if (audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current = null;
-        }
         const audio = new Audio(audioUrl);
         audioRef.current = audio;
       
         audio.addEventListener('loadedmetadata', () => {
           setDuration(audio.duration);
+          // Setup audio analysis once metadata is loaded
+          setTimeout(() => setupAudioAnalysis(audio), 100); // Small delay to ensure audio is ready
         });
         
         audio.addEventListener('ended', () => {
@@ -377,32 +430,6 @@ export const useAudioPlayer = (
         });
         
         audio.addEventListener('timeupdate', updateTime);
-        
-        return () => {
-          audio.removeEventListener('loadedmetadata', () => {});
-          audio.removeEventListener('ended', () => {});
-          audio.removeEventListener('timeupdate', updateTime);
-          audio.pause();
-          stopTimer();
-          
-          // Clean up processed URL
-          if (processedAudioUrl) {
-            URL.revokeObjectURL(processedAudioUrl);
-            setProcessedAudioUrl(null);
-          }
-          
-          // Clean up audio analysis
-          if (sourceRef.current) {
-            sourceRef.current.disconnect();
-            sourceRef.current = null;
-          }
-          
-          if (audioContext) {
-            audioContext.close();
-            setAudioContext(null);
-            setAnalyser(null);
-          }
-        };
       }
     } else {
       // Clean up any existing audio element
@@ -422,7 +449,7 @@ export const useAudioPlayer = (
       
       // Clean up audio analysis
       if (sourceRef.current) {
-        sourceRef.current.disconnect();
+        (sourceRef.current as MediaElementAudioSourceNode).disconnect();
         sourceRef.current = null;
       }
       
@@ -432,7 +459,7 @@ export const useAudioPlayer = (
         setAnalyser(null);
       }
     }
-  }, [audioUrl, updateTime, stopTimer, audioContext, autoEnhance, processAudio, processedAudioUrl, lastProcessedUrl, lastProcessedVolume, volumeLevel]);
+  }, [audioUrl, autoEnhance, volumeLevel, processAudio, forceRecreation]);
 
   const play = useCallback(async () => {
     if (audioRef.current) {
@@ -448,9 +475,11 @@ export const useAudioPlayer = (
         setState('playing');
         startTimer();
       } catch (error) {
-        // Silently handle playback errors
+        console.error('Audio playback failed:', error);
         setState('idle');
       }
+    } else {
+      console.error('Cannot play: audio element is not available');
     }
   }, [startTimer, state]);
 
@@ -474,10 +503,15 @@ export const useAudioPlayer = (
     stopTimer();
     setCurrentTime(0);
     
-    // Clean up audio analysis
+    // Clean up audio analysis and force audio element recreation
     if (sourceRef.current) {
-      sourceRef.current.disconnect();
+      const currentSource = sourceRef.current;
+      currentSource.disconnect();
       sourceRef.current = null;
+      
+      // Force recreation of audio element and its audio analysis
+      // This ensures we can create a new MediaElementAudioSourceNode next time
+      setForceRecreation(prev => prev + 1);
     }
   }, [stopTimer]);
 
