@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 
-export type RecordingState = 'idle' | 'recording' | 'paused' | 'stopped';
+export type RecordingState = 'idle' | 'countdown' | 'recording' | 'paused' | 'stopped';
 
 export interface AudioRecorderData {
   state: RecordingState;
@@ -10,6 +10,7 @@ export interface AudioRecorderData {
   currentTime: number;
   audioContext: AudioContext | null;
   analyser: AnalyserNode | null;
+  countdownValue: number;
 }
 
 export interface AudioRecorderActions {
@@ -27,6 +28,7 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
   const [currentTime, setCurrentTime] = useState(0);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
+  const [countdownValue, setCountdownValue] = useState(0);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -35,6 +37,7 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
   const pausedTimeRef = useRef<number>(0);
   const intervalRef = useRef<number | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const countdownTimerRef = useRef<number | null>(null);
 
   const updateTimer = useCallback(() => {
     const elapsed = Date.now() - startTimeRef.current;
@@ -56,6 +59,29 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
     }
   }, []);
 
+  const startCountdown = useCallback(async () => {
+    setState('countdown');
+    setCountdownValue(3);
+
+    return new Promise<void>((resolve) => {
+      let count = 3;
+      setCountdownValue(count);
+
+      const countdownInterval = setInterval(() => {
+        count -= 1;
+        setCountdownValue(count);
+
+        if (count <= 0) {
+          clearInterval(countdownInterval);
+          countdownTimerRef.current = null;
+          resolve();
+        }
+      }, 1000);
+
+      countdownTimerRef.current = countdownInterval;
+    });
+  }, []);
+
   const startRecording = useCallback(async () => {
     try {
       if (state === 'paused') {
@@ -73,6 +99,11 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
           console.error('Cannot resume: MediaRecorder is not in paused state');
           return;
         }
+      }
+
+      // Start countdown before new recording
+      if (state === 'idle') {
+        await startCountdown();
       }
 
       // Start new recording with enhanced audio constraints
@@ -190,7 +221,7 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
     } catch (error) {
       console.error('Error starting recording:', error);
     }
-  }, [selectedDeviceId, state, currentTime, startTimer, audioContext]);
+  }, [selectedDeviceId, state, currentTime, startTimer, audioContext, startCountdown]);
 
   const pauseRecording = useCallback(() => {
     if (mediaRecorderRef.current && state === 'recording') {
@@ -242,12 +273,18 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
       URL.revokeObjectURL(audioUrl);
     }
     
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    }
+    
     stopTimer();
     setState('idle');
     setAudioBlob(null);
     setAudioUrl(null);
     setDuration(0);
     setCurrentTime(0);
+    setCountdownValue(0);
     startTimeRef.current = 0;
     pausedTimeRef.current = 0;
     chunksRef.current = [];
@@ -261,7 +298,8 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
       duration,
       currentTime,
       audioContext,
-      analyser
+      analyser,
+      countdownValue
     } as AudioRecorderData,
     actions: {
       startRecording,

@@ -10,6 +10,7 @@ interface WaveformVisualizerProps {
   audioContext?: AudioContext | null;
   analyser?: AnalyserNode | null;
   onSeek?: (time: number) => void;
+  countdownValue?: number;
 }
 
 export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
@@ -19,7 +20,8 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   duration,
   audioContext,
   analyser,
-  onSeek
+  onSeek,
+  countdownValue
 }) => {
   const formatTime = (time: number) => {
     // Handle null, undefined, NaN, or negative values
@@ -269,7 +271,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
           const y = centerY - barHeight / 2;
 
           // Determine bar color with soft, light colors
-          let barColor = '#6b7280'; // Default soft gray
+          let barColor: string | CanvasGradient = '#6b7280'; // Default soft gray
           if (recordingState === 'recording') {
             // Soft cyan/blue gradient for recording with pulse effect
             const isRecentBar = index >= waveformData.length - 10;
@@ -309,11 +311,35 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
           ctx.fillRect(x, y, Math.max(barWidth - 1, 1), barHeight);
         });
       } else {
-        // Draw placeholder text with light color for dark background
-        ctx.fillStyle = '#d1d5db';
-        ctx.font = '18px system-ui, -apple-system, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('Click Record to start recording...', width / 2, height / 2);
+        // Draw countdown or placeholder text
+        if (recordingState === 'countdown' && countdownValue !== undefined && countdownValue > 0) {
+          // Draw countdown
+          ctx.fillStyle = '#ef4444'; // Red color for countdown
+          ctx.font = 'bold 72px system-ui, -apple-system, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          
+          // Add glow effect for countdown
+          ctx.shadowColor = '#ef4444';
+          ctx.shadowBlur = 20;
+          
+          ctx.fillText(countdownValue.toString(), width / 2, height / 2);
+          
+          // Reset shadow
+          ctx.shadowBlur = 0;
+          
+          // Add smaller text below countdown
+          ctx.fillStyle = '#f87171'; // Lighter red
+          ctx.font = '18px system-ui, -apple-system, sans-serif';
+          ctx.fillText('Get ready to record...', width / 2, height / 2 + 50);
+        } else {
+          // Draw placeholder text with light color for dark background
+          ctx.fillStyle = '#d1d5db';
+          ctx.font = '18px system-ui, -apple-system, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('Click Record to start recording...', width / 2, height / 2);
+        }
       }
 
       // Draw progress indicator line with soft glow effect
@@ -361,7 +387,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [waveformData, recordingState, playbackState, currentTime, duration]);
+  }, [waveformData, recordingState, playbackState, currentTime, duration, countdownValue]);
 
   const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
     if (!onSeek || duration === 0 || waveformData.length === 0) return;

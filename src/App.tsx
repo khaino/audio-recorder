@@ -14,7 +14,7 @@ function App() {
   const [isConverting, setIsConverting] = useState(false);
   
   // Audio enhancement hook
-  const { data: enhancementData, actions: enhancementActions } = useAudioEnhancement();
+  const { actions: enhancementActions } = useAudioEnhancement();
   
   const { data: recorderData, actions: recorderActions } = useAudioRecorder(selectedDeviceId);
   const { data: playerData, actions: playerActions } = useAudioPlayer(recorderData.audioUrl, true, selectedVolume); // Enable auto-enhancement with volume
@@ -117,6 +117,7 @@ function App() {
               audioContext={recorderData.audioContext || playerData.audioContext}
               analyser={recorderData.analyser || playerData.analyser}
               onSeek={playerActions.seek}
+              countdownValue={recorderData.countdownValue}
             />
           </div>
 

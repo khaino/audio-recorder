@@ -30,6 +30,15 @@ export const AudioControls: React.FC<AudioControlsProps> = ({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const getRecordButtonContent = () => {
     switch (recordingState) {
+      case 'countdown':
+        return (
+          <>
+            <svg className="w-6 h-6 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.293l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z" clipRule="evenodd" />
+            </svg>
+            Starting...
+          </>
+        );
       case 'recording':
         return (
           <>
@@ -135,13 +144,15 @@ export const AudioControls: React.FC<AudioControlsProps> = ({
             {/* Record/Pause Button */}
             <button
               onClick={handleRecordClick}
-              disabled={playbackState === 'playing'}
+              disabled={playbackState === 'playing' || recordingState === 'countdown'}
               className={`
                 flex items-center space-x-2 px-6 py-3 rounded-full font-medium transition-all duration-200
                 ${recordingState === 'recording' 
                   ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg' 
                   : recordingState === 'paused'
                   ? 'bg-yellow-500 hover:bg-yellow-600 text-white shadow-lg'
+                  : recordingState === 'countdown'
+                  ? 'bg-orange-500 text-white shadow-lg animate-pulse'
                   : 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:shadow-xl'
                 }
                 disabled:opacity-50 disabled:cursor-not-allowed
@@ -205,7 +216,7 @@ export const AudioControls: React.FC<AudioControlsProps> = ({
               {/* Start New Recording Button - Right position on desktop */}
               <button
                 onClick={handleStartNewRecording}
-                disabled={recordingState === 'recording' || playbackState === 'playing'}
+                disabled={recordingState === 'countdown' || playbackState === 'playing'}
                 className="
                   flex items-center space-x-2 px-6 py-3 rounded-full font-medium transition-all duration-200
                   bg-orange-500 hover:bg-orange-600 text-white shadow-lg hover:shadow-xl
@@ -257,7 +268,7 @@ export const AudioControls: React.FC<AudioControlsProps> = ({
               <div className="flex justify-center">
                 <button
                   onClick={handleStartNewRecording}
-                  disabled={recordingState === 'recording' || playbackState === 'playing'}
+                  disabled={recordingState === 'countdown' || playbackState === 'playing'}
                   className="
                     flex items-center space-x-2 px-6 py-3 rounded-full font-medium transition-all duration-200
                     bg-orange-500 hover:bg-orange-600 text-white shadow-lg hover:shadow-xl
