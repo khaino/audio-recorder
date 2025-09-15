@@ -147,6 +147,7 @@ function App() {
               }
               onSeek={playerActions.seek}
               countdownValue={recorderData.countdownValue}
+              onCutAudio={recorderActions.cutAudio}
             />
           </div>
 

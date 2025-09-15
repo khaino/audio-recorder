@@ -11,6 +11,7 @@ interface WaveformVisualizerProps {
   analyser?: AnalyserNode | null;
   onSeek?: (time: number) => void;
   countdownValue?: number;
+  onCutAudio?: (startTime: number, endTime: number) => void;
 }
 
 export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
@@ -21,7 +22,8 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   audioContext,
   analyser,
   onSeek,
-  countdownValue
+  countdownValue,
+  onCutAudio
 }) => {
   const formatTime = (time: number) => {
     // Handle null, undefined, NaN, or negative values
@@ -38,10 +40,28 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   const [waveformData, setWaveformData] = useState<number[]>([]);
   const [isRecordingComplete, setIsRecordingComplete] = useState(false);
   const [playbackStartTime, setPlaybackStartTime] = useState<number | null>(null);
+  
+  // Selection state
+  const [selectionStart, setSelectionStart] = useState<number | null>(null);
+  const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{x: number, y: number, visible: boolean}>({x: 0, y: 0, visible: false});
 
   const width = 1200;
   const height = 240;
   const cornerRadius = 24;
+
+  // Convert canvas x position to time
+  const canvasXToTime = (x: number): number => {
+    const progress = Math.max(0, Math.min(1, (x - 20) / (width - 40)));
+    return progress * duration;
+  };
+
+  // Convert time to canvas x position
+  const timeToCanvasX = (time: number): number => {
+    const progress = duration > 0 ? time / duration : 0;
+    return 20 + progress * (width - 40);
+  };
 
   // Function to get real audio amplitude from analyser
   const getRealAudioAmplitude = (): number => {
@@ -324,6 +344,28 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         }
       }
 
+      // Draw selection overlay
+      if (selectionStart !== null && selectionEnd !== null && duration > 0) {
+        const startX = timeToCanvasX(selectionStart);
+        const endX = timeToCanvasX(selectionEnd);
+        const minX = Math.min(startX, endX);
+        const maxX = Math.max(startX, endX);
+        
+        // Draw selection background
+        ctx.fillStyle = 'rgba(59, 130, 246, 0.2)'; // Blue with transparency
+        ctx.fillRect(minX, 15, maxX - minX, height - 30);
+        
+        // Draw selection borders
+        ctx.strokeStyle = '#3b82f6'; // Blue border
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(minX, 15);
+        ctx.lineTo(minX, height - 15);
+        ctx.moveTo(maxX, 15);
+        ctx.lineTo(maxX, height - 15);
+        ctx.stroke();
+      }
+
       // Draw progress indicator line with soft glow effect
       if (duration > 0 && waveformData.length > 0) {
         const progress = Math.min(currentTime / duration, 1);
@@ -369,21 +411,121 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [waveformData, recordingState, playbackState, currentTime, duration, countdownValue]);
+  }, [waveformData, recordingState, playbackState, currentTime, duration, countdownValue, selectionStart, selectionEnd, timeToCanvasX]);
 
-  const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!onSeek || duration === 0 || waveformData.length === 0) return;
+  const handleCanvasMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    if (duration === 0 || waveformData.length === 0) return;
+
+    // Ignore right-clicks - don't start new selection
+    if (event.button === 2) {
+      return;
+    }
 
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
-    const clickProgress = Math.max(0, Math.min(1, (x - 20) / (width - 40)));
-    const seekTime = clickProgress * duration;
+    const time = canvasXToTime(x);
 
-    onSeek(seekTime);
+    // Hide context menu
+    setContextMenu(prev => ({ ...prev, visible: false }));
+
+    // Start selection
+    setSelectionStart(time);
+    setSelectionEnd(time);
+    setIsSelecting(true);
   };
+
+  const handleCanvasMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isSelecting || duration === 0) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const time = canvasXToTime(x);
+
+    setSelectionEnd(time);
+  };
+
+  const handleCanvasMouseUp = () => {
+    if (!isSelecting) return;
+
+    setIsSelecting(false);
+
+    // If it's just a click (no drag), handle as seek
+    if (selectionStart !== null && selectionEnd !== null) {
+      const timeDiff = Math.abs(selectionEnd - selectionStart);
+      if (timeDiff < 0.1 && onSeek) { // Less than 0.1 second difference = click
+        onSeek(selectionStart);
+        setSelectionStart(null);
+        setSelectionEnd(null);
+      }
+    }
+  };
+
+  const handleCanvasRightClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    console.log('Right click detected', {
+      selectionStart,
+      selectionEnd,
+      hasSelection: selectionStart !== null && selectionEnd !== null,
+      selectionLength: selectionStart !== null && selectionEnd !== null ? Math.abs(selectionEnd - selectionStart) : 0
+    });
+    
+    // Show context menu only if there's a valid selection
+    if (selectionStart !== null && selectionEnd !== null && Math.abs(selectionEnd - selectionStart) > 0.1) {
+      console.log('Showing context menu for valid selection');
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        visible: true
+      });
+    } else {
+      console.log('No valid selection - not showing context menu');
+    }
+  };
+
+  const handleCutSelection = () => {
+    if (selectionStart !== null && selectionEnd !== null && onCutAudio) {
+      const startTime = Math.min(selectionStart, selectionEnd);
+      const endTime = Math.max(selectionStart, selectionEnd);
+      onCutAudio(startTime, endTime);
+      
+      // Clear selection and hide context menu
+      setSelectionStart(null);
+      setSelectionEnd(null);
+      setContextMenu(prev => ({ ...prev, visible: false }));
+    }
+  };
+
+  // Hide context menu when clicking elsewhere
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      
+      // Don't hide if clicking on the context menu itself
+      if (target.closest('.fixed.bg-white')) return;
+      
+      // Don't hide if clicking on the canvas (let canvas handle its own events)
+      if (target.closest('canvas')) return;
+      
+      // Hide context menu for any other clicks
+      console.log('Click outside detected, hiding context menu');
+      setContextMenu(prev => ({ ...prev, visible: false }));
+    };
+
+    // Only listen for left clicks to avoid interfering with right-clicks elsewhere
+    document.addEventListener('click', handleClickOutside);
+    
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
 
   return (
     <div className="flex flex-col items-center space-y-4">
@@ -392,8 +534,12 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
           ref={canvasRef}
           width={width}
           height={height}
-          onClick={handleCanvasClick}
-          className="cursor-pointer shadow-lg rounded-3xl"
+          onMouseDown={handleCanvasMouseDown}
+          onMouseMove={handleCanvasMouseMove}
+          onMouseUp={handleCanvasMouseUp}
+          onContextMenu={handleCanvasRightClick}
+          onMouseLeave={() => setIsSelecting(false)}
+          className={`shadow-lg rounded-3xl ${isSelecting ? 'cursor-crosshair' : 'cursor-pointer'}`}
           style={{ maxWidth: '100%', height: 'auto' }}
         />
       </div>
@@ -443,6 +589,38 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         )}
       </div>
       
+      {/* Context Menu */}
+      {contextMenu.visible && (
+        <div
+          className="fixed bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              console.log('Cut button clicked');
+              handleCutSelection();
+            }}
+            className="w-full px-4 py-2 text-left hover:bg-gray-100 text-sm text-gray-700 flex items-center"
+          >
+            <span className="mr-2">✂️</span>
+            Cut Selection
+          </button>
+          <div className="px-4 py-1 text-xs text-gray-500 border-t">
+            Debug: Menu visible at ({contextMenu.x}, {contextMenu.y})
+          </div>
+        </div>
+      )}
+      
+      {/* Debug info */}
+      <div className="text-xs text-gray-500 mt-2">
+        Selection: {selectionStart?.toFixed(2)}s - {selectionEnd?.toFixed(2)}s 
+        | Context Menu: {contextMenu.visible ? 'Visible' : 'Hidden'}
+      </div>
     </div>
   );
 };

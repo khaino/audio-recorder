@@ -18,6 +18,7 @@ export interface AudioRecorderActions {
   pauseRecording: () => void;
   stopRecording: () => void;
   resetRecording: () => void;
+  cutAudio: (startTime: number, endTime: number) => Promise<void>;
 }
 
 export const useAudioRecorder = (selectedDeviceId?: string) => {
@@ -292,6 +293,132 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
     chunksRef.current = [];
   }, [audioUrl, stopTimer]);
 
+  const cutAudio = useCallback(async (startTime: number, endTime: number) => {
+    if (!audioBlob) {
+      console.error('No audio to cut');
+      return;
+    }
+
+    try {
+      // Create audio context for processing
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      // Convert blob to array buffer
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+      
+      const sampleRate = audioBuffer.sampleRate;
+      const numberOfChannels = audioBuffer.numberOfChannels;
+      
+      // Calculate sample positions
+      const startSample = Math.floor(startTime * sampleRate);
+      const endSample = Math.floor(endTime * sampleRate);
+      
+      // Calculate new buffer length (original length minus cut section)
+      const originalLength = audioBuffer.length;
+      const cutLength = endSample - startSample;
+      const newLength = originalLength - cutLength;
+      
+      if (newLength <= 0) {
+        console.error('Cannot cut entire audio');
+        return;
+      }
+      
+      // Create new audio buffer
+      const newAudioBuffer = audioCtx.createBuffer(numberOfChannels, newLength, sampleRate);
+      
+      // Copy audio data, skipping the cut section
+      for (let channel = 0; channel < numberOfChannels; channel++) {
+        const originalData = audioBuffer.getChannelData(channel);
+        const newData = newAudioBuffer.getChannelData(channel);
+        
+        // Copy data before cut point
+        for (let i = 0; i < startSample; i++) {
+          newData[i] = originalData[i];
+        }
+        
+        // Copy data after cut point
+        for (let i = endSample; i < originalLength; i++) {
+          newData[i - cutLength] = originalData[i];
+        }
+      }
+      
+      // Convert back to WAV blob
+      const wavBuffer = audioBufferToWav(newAudioBuffer);
+      const newBlob = new Blob([wavBuffer], { type: 'audio/wav' });
+      
+      // Update state with cut audio
+      setAudioBlob(newBlob);
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+      setAudioUrl(URL.createObjectURL(newBlob));
+      
+      // Update duration
+      const newDuration = newAudioBuffer.length / sampleRate;
+      setDuration(newDuration);
+      
+      // Reset current time if it's beyond the new duration
+      if (currentTime > newDuration) {
+        setCurrentTime(newDuration);
+      }
+      
+      await audioCtx.close();
+      
+    } catch (error) {
+      console.error('Error cutting audio:', error);
+    }
+  }, [audioBlob, audioUrl, currentTime]);
+
+  // Helper function to convert AudioBuffer to WAV
+  const audioBufferToWav = useCallback((buffer: AudioBuffer): ArrayBuffer => {
+    const length = buffer.length;
+    const numberOfChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const bitsPerSample = 16;
+    const bytesPerSample = bitsPerSample / 8;
+    const blockAlign = numberOfChannels * bytesPerSample;
+    const byteRate = sampleRate * blockAlign;
+    const dataSize = length * blockAlign;
+    const bufferSize = 44 + dataSize;
+    
+    const arrayBuffer = new ArrayBuffer(bufferSize);
+    const view = new DataView(arrayBuffer);
+    
+    // WAV header
+    const writeString = (offset: number, string: string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+    
+    writeString(0, 'RIFF');
+    view.setUint32(4, bufferSize - 8, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numberOfChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitsPerSample, true);
+    writeString(36, 'data');
+    view.setUint32(40, dataSize, true);
+    
+    // Convert audio data
+    let offset = 44;
+    for (let i = 0; i < length; i++) {
+      for (let channel = 0; channel < numberOfChannels; channel++) {
+        const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i]));
+        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        offset += 2;
+      }
+    }
+    
+    return arrayBuffer;
+  }, []);
+
   return {
     data: {
       state,
@@ -307,7 +434,8 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
       startRecording,
       pauseRecording,
       stopRecording,
-      resetRecording
+      resetRecording,
+      cutAudio
     } as AudioRecorderActions
   };
 };
