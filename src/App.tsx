@@ -97,15 +97,34 @@ function App() {
         <div className="bg-white rounded-2xl shadow-xl p-8 space-y-8">
           {/* Top Controls Row */}
           <div className="flex justify-between items-center">
-            {/* Left: Audio Input Device - Only show when no recording exists, disable during recording */}
-            {!hasRecording && (
-              <div className="w-64">
-                <AudioInputSelector 
-                  onDeviceChange={handleDeviceChange}
-                  disabled={recorderData.state === 'countdown' || recorderData.state === 'recording' || recorderData.state === 'paused'}
-                />
-              </div>
-            )}
+            {/* Left: Undo Button and Audio Input Device */}
+            <div className="flex items-center space-x-4">
+              {/* Undo Button - Only show when there's something to undo */}
+              {recorderData.canUndo && (
+                <button
+                  onClick={recorderActions.undo}
+                  disabled={recorderData.state === 'recording' || recorderData.state === 'paused' || playerData.state === 'playing'}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg border-2 font-medium text-sm transition-all duration-200 ${
+                    (recorderData.state === 'recording' || recorderData.state === 'paused' || playerData.state === 'playing')
+                      ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 hover:border-orange-400 active:bg-orange-200'
+                  }`}
+                >
+                  <span className="text-lg">↶</span>
+                  <span>Undo</span>
+                </button>
+              )}
+              
+              {/* Audio Input Device - Only show when no recording exists, disable during recording */}
+              {!hasRecording && (
+                <div className="w-64">
+                  <AudioInputSelector 
+                    onDeviceChange={handleDeviceChange}
+                    disabled={recorderData.state === 'countdown' || recorderData.state === 'recording' || recorderData.state === 'paused'}
+                  />
+                </div>
+              )}
+            </div>
             
             {/* Right: Volume Control - Disable during recording and playback */}
             <div className={`flex items-center space-x-3 ${hasRecording ? 'ml-auto' : ''}`}>
@@ -148,6 +167,7 @@ function App() {
               onSeek={playerActions.seek}
               countdownValue={recorderData.countdownValue}
               onCutAudio={recorderActions.cutAudio}
+              audioBlob={recorderData.audioBlob}
             />
           </div>
 

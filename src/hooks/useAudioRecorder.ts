@@ -11,6 +11,7 @@ export interface AudioRecorderData {
   audioContext: AudioContext | null;
   analyser: AnalyserNode | null;
   countdownValue: number;
+  canUndo: boolean;
 }
 
 export interface AudioRecorderActions {
@@ -19,6 +20,7 @@ export interface AudioRecorderActions {
   stopRecording: () => void;
   resetRecording: () => void;
   cutAudio: (startTime: number, endTime: number) => Promise<void>;
+  undo: () => void;
 }
 
 export const useAudioRecorder = (selectedDeviceId?: string) => {
@@ -30,6 +32,12 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const [countdownValue, setCountdownValue] = useState(0);
+  
+  // Undo system - store up to 3 previous states
+  const [undoHistory, setUndoHistory] = useState<Array<{
+    blob: Blob;
+    duration: number;
+  }>>([]);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -291,13 +299,61 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
     startTimeRef.current = 0;
     pausedTimeRef.current = 0;
     chunksRef.current = [];
+    
+    // Clear undo history to prevent memory leaks
+    setUndoHistory([]);
   }, [audioUrl, stopTimer]);
+
+  // Save current state to undo history before making changes
+  const saveToUndoHistory = useCallback(() => {
+    if (!audioBlob) return;
+    
+    setUndoHistory(prev => {
+      const newHistory = [
+        {
+          blob: audioBlob,
+          duration: duration
+        },
+        ...prev.slice(0, 2) // Keep only the last 2 items (total 3 with new one)
+      ];
+      return newHistory;
+    });
+  }, [audioBlob, duration]);
+
+  // Undo the last operation
+  const undo = useCallback(() => {
+    if (undoHistory.length === 0) return;
+
+    const [previousState, ...remainingHistory] = undoHistory;
+    
+    // Clean up current URL
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+    }
+    
+    // Create new URL for the restored blob
+    const newUrl = URL.createObjectURL(previousState.blob);
+    
+    // Restore previous state
+    setAudioBlob(previousState.blob);
+    setAudioUrl(newUrl);
+    setDuration(previousState.duration);
+    setCurrentTime(0); // Reset playback position
+    
+    // Update undo history
+    setUndoHistory(remainingHistory);
+    
+    console.log('Undo completed - restored previous audio state');
+  }, [undoHistory, audioUrl]);
 
   const cutAudio = useCallback(async (startTime: number, endTime: number) => {
     if (!audioBlob) {
       console.error('No audio to cut');
       return;
     }
+
+    // Save current state to undo history before cutting
+    saveToUndoHistory();
 
     try {
       // Create audio context for processing
@@ -368,7 +424,7 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
     } catch (error) {
       console.error('Error cutting audio:', error);
     }
-  }, [audioBlob, audioUrl, currentTime]);
+  }, [audioBlob, audioUrl, currentTime, saveToUndoHistory]);
 
   // Helper function to convert AudioBuffer to WAV
   const audioBufferToWav = useCallback((buffer: AudioBuffer): ArrayBuffer => {
@@ -428,14 +484,16 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
       currentTime,
       audioContext,
       analyser,
-      countdownValue
+      countdownValue,
+      canUndo: undoHistory.length > 0
     } as AudioRecorderData,
     actions: {
       startRecording,
       pauseRecording,
       stopRecording,
       resetRecording,
-      cutAudio
+      cutAudio,
+      undo
     } as AudioRecorderActions
   };
 };

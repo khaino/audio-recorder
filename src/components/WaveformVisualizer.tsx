@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import type { RecordingState } from '../hooks/useAudioRecorder';
 import type { PlaybackState } from '../hooks/useAudioPlayer';
 
@@ -12,6 +12,7 @@ interface WaveformVisualizerProps {
   onSeek?: (time: number) => void;
   countdownValue?: number;
   onCutAudio?: (startTime: number, endTime: number) => void;
+  audioBlob?: Blob | null;
 }
 
 export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
@@ -23,7 +24,8 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   analyser,
   onSeek,
   countdownValue,
-  onCutAudio
+  onCutAudio,
+  audioBlob
 }) => {
   const formatTime = (time: number) => {
     // Handle null, undefined, NaN, or negative values
@@ -38,6 +40,8 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | undefined>(undefined);
   const [waveformData, setWaveformData] = useState<number[]>([]);
+  const [preloadedWaveform, setPreloadedWaveform] = useState<number[]>([]);
+  const [isWaveformLoaded, setIsWaveformLoaded] = useState(false);
   const [isRecordingComplete, setIsRecordingComplete] = useState(false);
   const [playbackStartTime, setPlaybackStartTime] = useState<number | null>(null);
   
@@ -45,6 +49,15 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
   const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
+  
+  // Dragging state for current time indicator
+  const [isDraggingCurrentTime, setIsDraggingCurrentTime] = useState(false);
+  const [isHoveringCurrentTime, setIsHoveringCurrentTime] = useState(false);
+  
+  // Track initial click position and previous selection for deselection logic
+  const [initialClickX, setInitialClickX] = useState<number | null>(null);
+  const [previousSelectionStart, setPreviousSelectionStart] = useState<number | null>(null);
+  const [previousSelectionEnd, setPreviousSelectionEnd] = useState<number | null>(null);
   const [contextMenu, setContextMenu] = useState<{x: number, y: number, visible: boolean}>({x: 0, y: 0, visible: false});
 
   const width = 1200;
@@ -62,6 +75,68 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     const progress = duration > 0 ? time / duration : 0;
     return 20 + progress * (width - 40);
   };
+
+  // Check if mouse is near current time indicator (within 15px)
+  const isNearCurrentTimeIndicator = (mouseX: number): boolean => {
+    if (duration === 0) return false;
+    const progress = Math.min(currentTime / duration, 1);
+    const indicatorX = 20 + progress * (width - 40);
+    return Math.abs(mouseX - indicatorX) <= 15;
+  };
+
+  // Check if the initial click was inside the previous selection
+  const wasClickInsidePreviousSelection = (): boolean => {
+    if (previousSelectionStart === null || previousSelectionEnd === null || initialClickX === null) return false;
+    const startX = timeToCanvasX(Math.min(previousSelectionStart, previousSelectionEnd));
+    const endX = timeToCanvasX(Math.max(previousSelectionStart, previousSelectionEnd));
+    return initialClickX >= startX && initialClickX <= endX;
+  };
+
+  // Generate preloaded waveform from audio blob
+  const generatePreloadedWaveform = useCallback(async (blob: Blob) => {
+    try {
+      console.log('Generating preloaded waveform...');
+      setIsWaveformLoaded(false);
+      
+      const arrayBuffer = await blob.arrayBuffer();
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+      
+      const samples = audioBuffer.getChannelData(0); // Use first channel
+      const targetPoints = Math.floor((width - 40) / 2); // One point per 2 pixels
+      const blockSize = Math.floor(samples.length / targetPoints);
+      
+      const waveform: number[] = [];
+      
+      for (let i = 0; i < targetPoints; i++) {
+        const start = i * blockSize;
+        const end = Math.min(start + blockSize, samples.length);
+        
+        // Calculate RMS for this block
+        let sum = 0;
+        for (let j = start; j < end; j++) {
+          sum += samples[j] * samples[j];
+        }
+        const rms = Math.sqrt(sum / (end - start));
+        
+        // Apply the same scaling as real-time waveform
+        const normalized = rms * 4; // Same as current scaling
+        const responsive = Math.pow(normalized, 0.6);
+        const scaled = Math.min(responsive, 0.85);
+        const finalAmplitude = Math.max(scaled, 0.08);
+        
+        waveform.push(finalAmplitude);
+      }
+      
+      setPreloadedWaveform(waveform);
+      setIsWaveformLoaded(true);
+      console.log(`Preloaded waveform generated: ${waveform.length} points`);
+      
+      await audioCtx.close();
+    } catch (error) {
+      console.error('Error generating preloaded waveform:', error);
+    }
+  }, [width]);
 
   // Function to get real audio amplitude from analyser
   const getRealAudioAmplitude = (): number => {
@@ -147,6 +222,15 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     }
   };
 
+  // Generate preloaded waveform when audio blob changes
+  useEffect(() => {
+    if (audioBlob && recordingState === 'stopped') {
+      generatePreloadedWaveform(audioBlob);
+    } else if (recordingState === 'idle') {
+      setPreloadedWaveform([]);
+      setIsWaveformLoaded(false);
+    }
+  }, [audioBlob, recordingState, generatePreloadedWaveform]);
 
   useEffect(() => {
     if (recordingState === 'recording') {
@@ -262,21 +346,23 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Draw waveform
-      if (waveformData.length > 0) {
-        const barWidth = (width - 40) / waveformData.length;
+      // Draw waveform - use preloaded waveform when available, otherwise real-time data
+      const currentWaveformData = isWaveformLoaded ? preloadedWaveform : waveformData;
+      
+      if (currentWaveformData.length > 0) {
+        const barWidth = (width - 40) / currentWaveformData.length;
         const centerY = height / 2;
 
-        waveformData.forEach((amplitude, index) => {
+        currentWaveformData.forEach((amplitude, index) => {
           const barHeight = amplitude * (height - 40);
           const x = 20 + index * barWidth;
           const y = centerY - barHeight / 2;
 
           // Determine bar color with soft, light colors
           let barColor: string | CanvasGradient = '#6b7280'; // Default soft gray
-          if (recordingState === 'recording') {
-            // Soft cyan/blue gradient for recording with pulse effect
-            const isRecentBar = index >= waveformData.length - 10;
+          if (recordingState === 'recording' && !isWaveformLoaded) {
+            // Soft cyan/blue gradient for recording with pulse effect (only for real-time)
+            const isRecentBar = index >= currentWaveformData.length - 10;
             const pulseIntensity = isRecentBar ? 0.7 + 0.3 * Math.sin(Date.now() / 300) : 0.6;
             const opacity = 0.8 + 0.2 * pulseIntensity;
             
@@ -285,15 +371,21 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
             barGradient.addColorStop(0, `rgba(56, 189, 248, ${opacity})`); // Light blue
             barGradient.addColorStop(1, `rgba(14, 165, 233, ${opacity * 0.8})`); // Slightly darker blue
             barColor = barGradient;
-          } else if (playbackState === 'playing') {
-            // Soft green/cyan gradient for playback with pulse for recent bars
-            const isRecentBar = index >= waveformData.length - 10;
-            const pulseIntensity = isRecentBar ? 0.7 + 0.3 * Math.sin(Date.now() / 300) : 0.6;
-            const opacity = 0.8 + 0.2 * pulseIntensity;
+          } else if (playbackState === 'playing' && isWaveformLoaded) {
+            // For preloaded waveform during playback, show different colors based on progress
+            const progressPosition = (currentTime / duration) * currentWaveformData.length;
+            const isPlayed = index < progressPosition;
             
             const barGradient = ctx.createLinearGradient(x, y, x, y + barHeight);
-            barGradient.addColorStop(0, `rgba(52, 211, 153, ${opacity})`); // Light green
-            barGradient.addColorStop(1, `rgba(16, 185, 129, ${opacity * 0.8})`); // Slightly darker green
+            if (isPlayed) {
+              // Already played - green
+              barGradient.addColorStop(0, 'rgba(52, 211, 153, 0.8)'); // Light green
+              barGradient.addColorStop(1, 'rgba(16, 185, 129, 0.6)'); // Darker green
+            } else {
+              // Not yet played - gray
+              barGradient.addColorStop(0, 'rgba(156, 163, 175, 0.6)'); // Light gray
+              barGradient.addColorStop(1, 'rgba(107, 114, 128, 0.4)'); // Darker gray
+            }
             barColor = barGradient;
           } else if (playbackState === 'paused') {
             // Soft static green for paused state
@@ -364,6 +456,23 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         ctx.moveTo(maxX, 15);
         ctx.lineTo(maxX, height - 15);
         ctx.stroke();
+        
+        // Draw start and end time timestamps above selection borders
+        ctx.fillStyle = '#3b82f6';
+        ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'center';
+        
+        // Start time timestamp
+        const startTimeText = formatTime(Math.min(selectionStart, selectionEnd));
+        const startTextWidth = ctx.measureText(startTimeText).width;
+        const startTextX = Math.max(startTextWidth / 2 + 4, Math.min(width - startTextWidth / 2 - 4, minX));
+        ctx.fillText(startTimeText, startTextX, 10);
+        
+        // End time timestamp
+        const endTimeText = formatTime(Math.max(selectionStart, selectionEnd));
+        const endTextWidth = ctx.measureText(endTimeText).width;
+        const endTextX = Math.max(endTextWidth / 2 + 4, Math.min(width - endTextWidth / 2 - 4, maxX));
+        ctx.fillText(endTimeText, endTextX, 10);
       }
 
       // Draw progress indicator line with soft glow effect
@@ -393,6 +502,15 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         
         // Reset shadow
         ctx.shadowBlur = 0;
+        
+        // Draw current time timestamp above the progress indicator
+        ctx.fillStyle = playbackState === 'playing' ? '#059669' : recordingState === 'recording' ? '#2563eb' : '#6b7280';
+        ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'center';
+        const currentTimeText = formatTime(currentTime);
+        const currentTextWidth = ctx.measureText(currentTimeText).width;
+        const currentTextX = Math.max(currentTextWidth / 2 + 4, Math.min(width - currentTextWidth / 2 - 4, lineX));
+        ctx.fillText(currentTimeText, currentTextX, 10);
       }
     };
 
@@ -414,7 +532,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   }, [waveformData, recordingState, playbackState, currentTime, duration, countdownValue, selectionStart, selectionEnd, timeToCanvasX]);
 
   const handleCanvasMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    if (duration === 0 || waveformData.length === 0) return;
+    if (duration === 0) return;
 
     // Ignore right-clicks - don't start new selection
     if (event.button === 2) {
@@ -431,14 +549,29 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     // Hide context menu
     setContextMenu(prev => ({ ...prev, visible: false }));
 
-    // Start selection
+    // Check if clicking on current time indicator
+    if (isNearCurrentTimeIndicator(x)) {
+      console.log('Starting to drag current time indicator');
+      setIsDraggingCurrentTime(true);
+      return;
+    }
+
+    // Only start selection if we have waveform data
+    if (waveformData.length === 0 && !isWaveformLoaded) return;
+
+    // Store previous selection and initial click position for deselection logic
+    setPreviousSelectionStart(selectionStart);
+    setPreviousSelectionEnd(selectionEnd);
+    setInitialClickX(x);
+
+    // Start new selection (this will be refined in mouse up if it's just a click)
     setSelectionStart(time);
     setSelectionEnd(time);
     setIsSelecting(true);
   };
 
   const handleCanvasMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isSelecting || duration === 0) return;
+    if (duration === 0) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -447,23 +580,70 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     const x = event.clientX - rect.left;
     const time = canvasXToTime(x);
 
-    setSelectionEnd(time);
+    // Handle dragging current time indicator
+    if (isDraggingCurrentTime) {
+      console.log('Dragging current time to:', time);
+      if (onSeek) {
+        onSeek(Math.max(0, Math.min(time, duration)));
+      }
+      return;
+    }
+
+    // Update hover state for current time indicator
+    setIsHoveringCurrentTime(isNearCurrentTimeIndicator(x));
+
+    // Handle selection
+    if (isSelecting) {
+      setSelectionEnd(time);
+    }
   };
 
   const handleCanvasMouseUp = () => {
+    // Handle ending drag of current time indicator
+    if (isDraggingCurrentTime) {
+      console.log('Finished dragging current time indicator');
+      setIsDraggingCurrentTime(false);
+      return;
+    }
+
     if (!isSelecting) return;
 
     setIsSelecting(false);
 
-    // If it's just a click (no drag), handle as seek
+    // If it's just a click (no drag), handle deselection logic
     if (selectionStart !== null && selectionEnd !== null) {
       const timeDiff = Math.abs(selectionEnd - selectionStart);
-      if (timeDiff < 0.1 && onSeek) { // Less than 0.1 second difference = click
-        onSeek(selectionStart);
-        setSelectionStart(null);
-        setSelectionEnd(null);
+      if (timeDiff < 0.1) { // Less than 0.1 second difference = click
+        // Check if the click was outside the previous selection
+        if (previousSelectionStart !== null && previousSelectionEnd !== null && !wasClickInsidePreviousSelection()) {
+          // Clicked outside previous selection - deselect and seek
+          console.log('Clicked outside selection - deselecting and seeking');
+          if (onSeek) {
+            onSeek(selectionStart);
+          }
+          setSelectionStart(null);
+          setSelectionEnd(null);
+        } else if (previousSelectionStart === null && previousSelectionEnd === null) {
+          // No previous selection - just seek and clear
+          console.log('Single click with no previous selection - seeking');
+          if (onSeek) {
+            onSeek(selectionStart);
+          }
+          setSelectionStart(null);
+          setSelectionEnd(null);
+        } else {
+          // Clicked inside previous selection - restore the previous selection
+          console.log('Clicked inside selection - restoring previous selection');
+          setSelectionStart(previousSelectionStart);
+          setSelectionEnd(previousSelectionEnd);
+        }
       }
     }
+
+    // Clean up tracking state
+    setInitialClickX(null);
+    setPreviousSelectionStart(null);
+    setPreviousSelectionEnd(null);
   };
 
   const handleCanvasRightClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -538,8 +718,20 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
           onMouseMove={handleCanvasMouseMove}
           onMouseUp={handleCanvasMouseUp}
           onContextMenu={handleCanvasRightClick}
-          onMouseLeave={() => setIsSelecting(false)}
-          className={`shadow-lg rounded-3xl ${isSelecting ? 'cursor-crosshair' : 'cursor-pointer'}`}
+          onMouseLeave={() => {
+            setIsSelecting(false);
+            setIsDraggingCurrentTime(false);
+            setIsHoveringCurrentTime(false);
+          }}
+          className={`shadow-lg rounded-3xl ${
+            isDraggingCurrentTime 
+              ? 'cursor-grabbing' 
+              : isHoveringCurrentTime 
+                ? 'cursor-grab' 
+                : isSelecting 
+                  ? 'cursor-crosshair' 
+                  : 'cursor-pointer'
+          }`}
           style={{ maxWidth: '100%', height: 'auto' }}
         />
       </div>
@@ -616,11 +808,20 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         </div>
       )}
       
-      {/* Debug info */}
-      <div className="text-xs text-gray-500 mt-2">
-        Selection: {selectionStart?.toFixed(2)}s - {selectionEnd?.toFixed(2)}s 
-        | Context Menu: {contextMenu.visible ? 'Visible' : 'Hidden'}
-      </div>
+      {/* Selection timestamps */}
+      {selectionStart !== null && selectionEnd !== null && (
+        <div className="text-sm text-gray-700 mt-2 bg-blue-50 px-3 py-2 rounded-lg border">
+          <div className="flex items-center justify-center space-x-4">
+            <span className="font-medium text-blue-800">Selection:</span>
+            <span className="text-blue-700">
+              {formatTime(Math.min(selectionStart, selectionEnd))} - {formatTime(Math.max(selectionStart, selectionEnd))}
+            </span>
+            <span className="text-blue-600 text-xs">
+              Duration: {formatTime(Math.abs(selectionEnd - selectionStart))}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
