@@ -6,6 +6,7 @@ import { useAudioRecorder } from './hooks/useAudioRecorder';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { useFileManager } from './hooks/useFileManager';
 import { useAudioEnhancement } from './hooks/useAudioEnhancement';
+import logo from './assets/logo.png';
 
 function App() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
@@ -72,9 +73,21 @@ function App() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Audio Recorder
-          </h1>
+          <div className="flex items-center justify-center mb-4">
+            <img 
+              src={logo} 
+              alt="Audio Recorder Logo" 
+              className="w-12 h-12"
+            />
+            <h1 className="text-4xl font-bold text-gray-900">
+              Audio Recorder
+            </h1>
+            <img 
+              src={logo} 
+              alt="Audio Recorder Logo" 
+              className="w-12 h-12 mr-2"
+            />
+          </div>
           <p className="text-lg text-gray-600">
             Record, enhance, and playback professional-quality audio
           </p>
