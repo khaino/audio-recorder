@@ -60,36 +60,88 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   const [previousSelectionStart, setPreviousSelectionStart] = useState<number | null>(null);
   const [previousSelectionEnd, setPreviousSelectionEnd] = useState<number | null>(null);
   const [contextMenu, setContextMenu] = useState<{x: number, y: number, visible: boolean}>({x: 0, y: 0, visible: false});
+  
+  // Mode state: 'seek' (default) or 'select'
+  const [interactionMode, setInteractionMode] = useState<'seek' | 'select'>('seek');
+  
+  // Reset to seek mode when not in playback states
+  useEffect(() => {
+    if (!(playbackState === 'playing' || playbackState === 'paused' || 
+          (recordingState === 'stopped' && duration > 0))) {
+      setInteractionMode('seek');
+      // Also clear any selections when buttons are hidden
+      setSelectionStart(null);
+      setSelectionEnd(null);
+    }
+  }, [playbackState, recordingState, duration]);
 
   const width = 1200;
   const height = 240;
   const cornerRadius = 24;
 
-  // Convert canvas x position to time
+  // Convert canvas x position to time (accounting for CSS scaling)
   const canvasXToTime = (x: number): number => {
-    const progress = Math.max(0, Math.min(1, (x - 20) / (width - 40)));
+    const canvas = canvasRef.current;
+    if (!canvas) return 0;
+    
+    // Get the actual rendered dimensions vs canvas dimensions
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = width / rect.width;
+    
+    // Scale the mouse x coordinate to match canvas coordinate system
+    const scaledX = x * scaleX;
+    
+    
+    const progress = Math.max(0, Math.min(1, (scaledX - 20) / (width - 40)));
     return progress * duration;
   };
 
-  // Convert time to canvas x position
+  // Convert time to canvas x position for drawing (unscaled canvas coordinates)
   const timeToCanvasX = (time: number): number => {
     const progress = duration > 0 ? time / duration : 0;
     return 20 + progress * (width - 40);
   };
 
+  // Convert time to rendered x position for mouse interactions (scaled coordinates)  
+  const timeToRenderedX = (time: number): number => {
+    const canvas = canvasRef.current;
+    if (!canvas) return 20;
+    
+    const progress = duration > 0 ? time / duration : 0;
+    const canvasX = 20 + progress * (width - 40);
+    
+    // Get the actual rendered dimensions vs canvas dimensions
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width / width;
+    
+    // Scale the canvas coordinate to match rendered coordinate system
+    return canvasX * scaleX;
+  };
+
   // Check if mouse is near current time indicator (within 15px)
   const isNearCurrentTimeIndicator = (mouseX: number): boolean => {
     if (duration === 0) return false;
-    const progress = Math.min(currentTime / duration, 1);
-    const indicatorX = 20 + progress * (width - 40);
-    return Math.abs(mouseX - indicatorX) <= 15;
+    const canvas = canvasRef.current;
+    if (!canvas) return false;
+    
+    // Get rendered position of current time indicator
+    const renderedIndicatorX = timeToRenderedX(currentTime);
+    
+    // Get the actual rendered dimensions vs canvas dimensions
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width / width;
+    
+    // Scale the threshold as well
+    const threshold = 15 * scaleX;
+    
+    return Math.abs(mouseX - renderedIndicatorX) <= threshold;
   };
 
   // Check if the initial click was inside the previous selection
   const wasClickInsidePreviousSelection = (): boolean => {
     if (previousSelectionStart === null || previousSelectionEnd === null || initialClickX === null) return false;
-    const startX = timeToCanvasX(Math.min(previousSelectionStart, previousSelectionEnd));
-    const endX = timeToCanvasX(Math.max(previousSelectionStart, previousSelectionEnd));
+    const startX = timeToRenderedX(Math.min(previousSelectionStart, previousSelectionEnd));
+    const endX = timeToRenderedX(Math.max(previousSelectionStart, previousSelectionEnd));
     return initialClickX >= startX && initialClickX <= endX;
   };
 
@@ -550,25 +602,41 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     // Hide context menu
     setContextMenu(prev => ({ ...prev, visible: false }));
 
-    // Check if clicking on current time indicator
+    // Check if clicking on current time indicator (always draggable regardless of mode)
     if (isNearCurrentTimeIndicator(x)) {
       console.log('Starting to drag current time indicator');
       setIsDraggingCurrentTime(true);
       return;
     }
 
-    // Only start selection if we have waveform data
-    if (waveformData.length === 0 && !isWaveformLoaded) return;
+    // Handle different interaction modes
+    if (interactionMode === 'seek') {
+      // In seek mode, clicking seeks to that position
+      if (onSeek) {
+        onSeek(time);
+      }
+      // Clear any existing selection
+      setSelectionStart(null);
+      setSelectionEnd(null);
+      return;
+    }
 
-    // Store previous selection and initial click position for deselection logic
-    setPreviousSelectionStart(selectionStart);
-    setPreviousSelectionEnd(selectionEnd);
-    setInitialClickX(x);
+    // Selection mode behavior
+    if (interactionMode === 'select') {
+      // Only start selection if we have waveform data
+      if (waveformData.length === 0 && !isWaveformLoaded) return;
 
-    // Start new selection (this will be refined in mouse up if it's just a click)
-    setSelectionStart(time);
-    setSelectionEnd(time);
-    setIsSelecting(true);
+      // Store previous selection and initial click position for deselection logic
+      setPreviousSelectionStart(selectionStart);
+      setPreviousSelectionEnd(selectionEnd);
+      setInitialClickX(x);
+
+      // Start new selection (this will be refined in mouse up if it's just a click)
+      console.log(`Starting selection at time: ${time}, mouseX: ${x}, canvasX: ${timeToCanvasX(time)}, renderedX: ${timeToRenderedX(time)}`);
+      setSelectionStart(time);
+      setSelectionEnd(time);
+      setIsSelecting(true);
+    }
   };
 
   const handleCanvasMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -593,8 +661,8 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     // Update hover state for current time indicator
     setIsHoveringCurrentTime(isNearCurrentTimeIndicator(x));
 
-    // Handle selection
-    if (isSelecting) {
+    // Handle selection (only in select mode)
+    if (interactionMode === 'select' && isSelecting) {
       setSelectionEnd(time);
     }
   };
@@ -607,7 +675,8 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       return;
     }
 
-    if (!isSelecting) return;
+    // Only handle selection logic in select mode
+    if (interactionMode !== 'select' || !isSelecting) return;
 
     setIsSelecting(false);
 
@@ -617,19 +686,13 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       if (timeDiff < 0.1) { // Less than 0.1 second difference = click
         // Check if the click was outside the previous selection
         if (previousSelectionStart !== null && previousSelectionEnd !== null && !wasClickInsidePreviousSelection()) {
-          // Clicked outside previous selection - deselect and seek
-          console.log('Clicked outside selection - deselecting and seeking');
-          if (onSeek) {
-            onSeek(selectionStart);
-          }
+          // Clicked outside previous selection - deselect (no seeking in select mode)
+          console.log('Clicked outside selection - deselecting');
           setSelectionStart(null);
           setSelectionEnd(null);
         } else if (previousSelectionStart === null && previousSelectionEnd === null) {
-          // No previous selection - just seek and clear
-          console.log('Single click with no previous selection - seeking');
-          if (onSeek) {
-            onSeek(selectionStart);
-          }
+          // No previous selection - just clear (no seeking in select mode)
+          console.log('Single click with no previous selection - clearing');
           setSelectionStart(null);
           setSelectionEnd(null);
         } else {
@@ -710,6 +773,48 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
 
   return (
     <div className="flex flex-col items-center space-y-4">
+      {/* Mode Toggle Buttons - Only show during playback */}
+      {(playbackState === 'playing' || playbackState === 'paused' || 
+        (recordingState === 'stopped' && duration > 0)) && (
+        <div className="flex items-center space-x-2 self-start ml-4">
+        <button
+          onClick={() => {
+            setInteractionMode('seek');
+            // Clear selection when switching to seek mode
+            setSelectionStart(null);
+            setSelectionEnd(null);
+          }}
+          className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${
+            interactionMode === 'seek'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          <div className="flex items-center space-x-1">
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+            </svg>
+            <span>Seek</span>
+          </div>
+        </button>
+        <button
+          onClick={() => setInteractionMode('select')}
+          className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${
+            interactionMode === 'select'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          <div className="flex items-center space-x-1">
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M3 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 13a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3zM12 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1V4zM12 13a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-3z" clipRule="evenodd" />
+            </svg>
+            <span>Select</span>
+          </div>
+        </button>
+        </div>
+      )}
+      
       <div className="relative">
         <canvas
           ref={canvasRef}
@@ -729,7 +834,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
               ? 'cursor-grabbing' 
               : isHoveringCurrentTime 
                 ? 'cursor-grab' 
-                : isSelecting 
+                : interactionMode === 'select'
                   ? 'cursor-crosshair' 
                   : 'cursor-pointer'
           }`}
