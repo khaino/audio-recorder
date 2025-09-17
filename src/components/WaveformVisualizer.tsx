@@ -13,6 +13,8 @@ interface WaveformVisualizerProps {
   countdownValue?: number;
   onCutAudio?: (startTime: number, endTime: number) => void;
   audioBlob?: Blob | null;
+  canUndo?: boolean;
+  onUndo?: () => void;
 }
 
 export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
@@ -25,7 +27,9 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   onSeek,
   countdownValue,
   onCutAudio,
-  audioBlob
+  audioBlob,
+  canUndo,
+  onUndo
 }) => {
   const formatTime = (time: number) => {
     // Handle null, undefined, NaN, or negative values
@@ -632,7 +636,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       setInitialClickX(x);
 
       // Start new selection (this will be refined in mouse up if it's just a click)
-      console.log(`Starting selection at time: ${time}, mouseX: ${x}, canvasX: ${timeToCanvasX(time)}, renderedX: ${timeToRenderedX(time)}`);
       setSelectionStart(time);
       setSelectionEnd(time);
       setIsSelecting(true);
@@ -772,48 +775,68 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   }, []);
 
   return (
-    <div className="flex flex-col items-center space-y-4">
-      {/* Mode Toggle Buttons - Only show during playback */}
-      {(playbackState === 'playing' || playbackState === 'paused' || 
-        (recordingState === 'stopped' && duration > 0)) && (
-        <div className="flex items-center space-x-2 self-start ml-4">
-        <button
-          onClick={() => {
-            setInteractionMode('seek');
-            // Clear selection when switching to seek mode
-            setSelectionStart(null);
-            setSelectionEnd(null);
-          }}
-          className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${
-            interactionMode === 'seek'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          <div className="flex items-center space-x-1">
-            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-            </svg>
-            <span>Seek</span>
-          </div>
-        </button>
-        <button
-          onClick={() => setInteractionMode('select')}
-          className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${
-            interactionMode === 'select'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          <div className="flex items-center space-x-1">
-            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M3 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 13a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3zM12 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1V4zM12 13a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-3z" clipRule="evenodd" />
-            </svg>
-            <span>Select</span>
-          </div>
-        </button>
-        </div>
-      )}
+    <div className="flex flex-col items-center space-y-2">
+      {/* Mode Toggle Buttons - Reserve space to prevent layout shift */}
+      <div className="flex items-center space-x-2 self-start ml-4 h-6">
+        {(playbackState === 'playing' || playbackState === 'paused' || 
+          (recordingState === 'stopped' && duration > 0)) ? (
+          <>
+            <button
+              onClick={() => {
+                setInteractionMode('seek');
+                // Clear selection when switching to seek mode
+                setSelectionStart(null);
+                setSelectionEnd(null);
+              }}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors duration-200 ${
+                interactionMode === 'seek'
+                  ? 'bg-slate-100 text-slate-900 border border-slate-300'
+                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-700'
+              }`}
+            >
+              <div className="flex items-center space-x-1">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                </svg>
+                <span>Seek</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setInteractionMode('select')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors duration-200 ${
+                interactionMode === 'select'
+                  ? 'bg-slate-100 text-slate-900 border border-slate-300'
+                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-700'
+              }`}
+            >
+              <div className="flex items-center space-x-1">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M3 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 13a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3zM12 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1V4zM12 13a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-3z" clipRule="evenodd" />
+                </svg>
+                <span>Select</span>
+              </div>
+            </button>
+            
+            {/* Undo Button - Only show when there's something to undo */}
+            {canUndo && (
+              <button
+                onClick={onUndo}
+                disabled={recordingState === 'recording' || recordingState === 'paused' || playbackState === 'playing'}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors duration-200 ${
+                  (recordingState === 'recording' || recordingState === 'paused' || playbackState === 'playing')
+                    ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-700'
+                }`}
+              >
+                <div className="flex items-center space-x-1">
+                  <span className="text-sm">↶</span>
+                  <span>Undo</span>
+                </div>
+              </button>
+            )}
+          </>
+        ) : null}
+      </div>
       
       <div className="relative">
         <canvas
