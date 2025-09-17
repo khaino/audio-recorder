@@ -48,6 +48,8 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   const [preloadedWaveform, setPreloadedWaveform] = useState<number[]>([]);
   const [isWaveformLoaded, setIsWaveformLoaded] = useState(false);
   const [isRecordingComplete, setIsRecordingComplete] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState(0);
   const [playbackStartTime, setPlaybackStartTime] = useState<number | null>(null);
   
   // Selection state
@@ -154,10 +156,17 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     try {
       console.log('Generating preloaded waveform...');
       setIsWaveformLoaded(false);
+      setIsProcessing(true);
+      setProcessingProgress(0);
       
+      // Step 1: Load and decode audio (30% of progress)
+      setProcessingProgress(10);
       const arrayBuffer = await blob.arrayBuffer();
+      setProcessingProgress(20);
+      
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+      setProcessingProgress(30);
       
       const samples = audioBuffer.getChannelData(0); // Use first channel
       const targetPoints = Math.floor((width - 40) / 2); // One point per 2 pixels
@@ -165,6 +174,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       
       const waveform: number[] = [];
       
+      // Step 2: Process waveform data (70% of progress)
       for (let i = 0; i < targetPoints; i++) {
         const start = i * blockSize;
         const end = Math.min(start + blockSize, samples.length);
@@ -183,15 +193,33 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         const finalAmplitude = Math.max(scaled, 0.08);
         
         waveform.push(finalAmplitude);
+        
+        // Update progress every 100 points or so
+        if (i % 100 === 0 || i === targetPoints - 1) {
+          const progressPercent = 30 + Math.floor((i / targetPoints) * 70);
+          setProcessingProgress(progressPercent);
+          // Allow UI to update
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
       }
       
       setPreloadedWaveform(waveform);
+      setProcessingProgress(100);
+      
+      // Small delay to show 100% before hiding
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       setIsWaveformLoaded(true);
+      setIsProcessing(false);
+      setProcessingProgress(0);
+      
       console.log(`Preloaded waveform generated: ${waveform.length} points`);
       
       await audioCtx.close();
     } catch (error) {
       console.error('Error generating preloaded waveform:', error);
+      setIsProcessing(false);
+      setProcessingProgress(0);
     }
   }, [width]);
 
@@ -948,6 +976,39 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
             <span className="text-blue-600 text-xs">
               Duration: {formatTime(Math.abs(selectionEnd - selectionStart))}
             </span>
+          </div>
+        </div>
+      )}
+      
+      {/* Processing Popup */}
+      {isProcessing && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
+            <div className="text-center">
+              <div className="mb-4">
+                <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-3">
+                  <svg className="w-6 h-6 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Processing Audio</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Generating waveform for playback...
+                </p>
+              </div>
+              
+              {/* Progress Bar */}
+              <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${processingProgress}%` }}
+                ></div>
+              </div>
+              <div className="text-xs text-gray-500">
+                {processingProgress}% complete
+              </div>
+            </div>
           </div>
         </div>
       )}
