@@ -86,26 +86,28 @@ function App() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-12">
+        <header className="text-center mb-12">
           <div className="flex items-center justify-center mb-4">
             <img 
               src={logo} 
               alt="Audio Recorder Logo" 
               className="w-12 h-12"
             />
-            <h1 className="text-4xl font-bold text-gray-900">
+            <h1 className="text-4xl font-bold text-gray-900 mx-4">
               Audio Recorder
             </h1>
             <img 
               src={logo} 
               alt="Audio Recorder Logo" 
-              className="w-12 h-12 mr-2"
+              className="w-12 h-12"
             />
           </div>
           <p className="text-lg text-gray-600">
             Record, enhance, and playback professional-quality audio
           </p>
-        </div>
+        </header>
+
+        {/* Social Sharing Bar */}
 
         {/* Main Content */}
         <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6">
@@ -272,6 +274,35 @@ function App() {
           )}
 
         </div>
+
+        {/* Footer */}
+        <footer className="mt-12 text-center">
+          <div className="max-w-4xl mx-auto border-t border-gray-200 pt-8">
+            <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+              {/* Copyright */}
+              <div className="text-sm text-gray-500">
+                <p>&copy; 2025 AudioRecorder.ai. All rights reserved.</p>
+                <p className="mt-1">Professional audio recording made simple.</p>
+              </div>
+              
+              {/* Contact */}
+              <div className="text-sm text-gray-600">
+                <p className="mb-2">Have feedback or need help?</p>
+                <a 
+                  href="mailto:hello@audiorecorder.ai" 
+                  className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors duration-200"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/>
+                    <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/>
+                  </svg>
+                  <span>hello@audiorecorder.ai</span>
+                </a>
+              </div>
+            </div>
+            
+          </div>
+        </footer>
 
       </div>
       
