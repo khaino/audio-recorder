@@ -160,6 +160,9 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       setIsProcessing(true);
       setProcessingProgress(0);
       
+      // Ensure popup is visible for at least a brief moment before starting
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
       // Step 1: Load and decode audio (30% of progress)
       setProcessingProgress(10);
       const arrayBuffer = await blob.arrayBuffer();
@@ -207,8 +210,9 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       setPreloadedWaveform(waveform);
       setProcessingProgress(100);
       
-      // Small delay to show 100% before hiding
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Show 100% completion for at least 700ms so users can read the message
+      // This prevents the popup from flashing too quickly on short audio files
+      await new Promise(resolve => setTimeout(resolve, 700));
       
       setIsWaveformLoaded(true);
       setIsProcessing(false);
@@ -825,7 +829,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
               }}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors duration-200 ${
                 interactionMode === 'seek'
-                  ? 'bg-slate-100 text-slate-900 border border-slate-300'
+                  ? 'bg-blue-500 text-white border border-blue-600 shadow-md'
                   : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-700'
               }`}
             >
@@ -840,7 +844,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
               onClick={() => setInteractionMode('select')}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors duration-200 ${
                 interactionMode === 'select'
-                  ? 'bg-slate-100 text-slate-900 border border-slate-300'
+                  ? 'bg-blue-500 text-white border border-blue-600 shadow-md'
                   : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-700'
               }`}
             >
