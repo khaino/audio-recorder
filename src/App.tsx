@@ -13,6 +13,7 @@ function App() {
   const [selectedFormat, setSelectedFormat] = useState<'mp3' | 'wav' | 'webm'>('mp3');
   const [selectedVolume, setSelectedVolume] = useState<'low' | 'standard' | 'high'>('standard');
   const [isConverting, setIsConverting] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   
   // Audio enhancement hook
   const { actions: enhancementActions } = useAudioEnhancement();
@@ -50,6 +51,19 @@ function App() {
 
   const handleVolumeChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedVolume(event.target.value as 'low' | 'standard' | 'high');
+  }, []);
+
+  const handleStartNewRecording = useCallback(() => {
+    setShowConfirmDialog(true);
+  }, []);
+
+  const handleConfirmNewRecording = useCallback(() => {
+    setShowConfirmDialog(false);
+    recorderActions.resetRecording();
+  }, [recorderActions.resetRecording]);
+
+  const handleCancelNewRecording = useCallback(() => {
+    setShowConfirmDialog(false);
   }, []);
 
   const hasRecording = recorderData.audioBlob !== null;
@@ -97,7 +111,7 @@ function App() {
         <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6">
           {/* Top Controls Row */}
           <div className="flex justify-between items-center">
-            {/* Left: Audio Input Device */}
+            {/* Left: Audio Input Device or Start New Recording */}
             <div className="flex items-center space-x-4">
               {/* Audio Input Device - Only show when no recording exists, disable during recording */}
               {!hasRecording && (
@@ -107,6 +121,24 @@ function App() {
                     disabled={recorderData.state === 'countdown' || recorderData.state === 'recording' || recorderData.state === 'paused'}
                   />
                 </div>
+              )}
+              
+              {/* Start New Recording Button - Only show when there's a recording */}
+              {hasRecording && (
+                <button
+                  onClick={handleStartNewRecording}
+                  disabled={recorderData.state === 'countdown' || playerData.state === 'playing'}
+                  className={`flex items-center justify-center space-x-2 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-medium w-32 ${
+                    (recorderData.state === 'countdown' || playerData.state === 'playing')
+                      ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-gray-300'
+                      : 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100 hover:text-orange-800'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                  <span>New</span>
+                </button>
               )}
             </div>
             
@@ -172,7 +204,6 @@ function App() {
             onPlay={playerActions.play}
             onPausePlayback={playerActions.pause}
             onStopPlayback={playerActions.stop}
-            onStartNewRecording={recorderActions.resetRecording}
           />
           </div>
 
@@ -243,6 +274,34 @@ function App() {
         </div>
 
       </div>
+      
+      {/* Confirmation Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Start New Recording?
+            </h3>
+            <p className="text-gray-600 mb-6">
+              This will clear all current recording data and start fresh. This action cannot be undone.
+            </p>
+            <div className="flex space-x-3 justify-end">
+              <button
+                onClick={handleCancelNewRecording}
+                className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmNewRecording}
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors duration-200"
+              >
+                Start New Recording
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

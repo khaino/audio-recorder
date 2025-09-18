@@ -864,7 +864,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
                 }`}
               >
                 <div className="flex items-center space-x-1">
-                  <span className="text-sm">↶</span>
+                  <span className="w-3 h-3 flex items-center justify-center text-xs">↶</span>
                   <span>Undo</span>
                 </div>
               </button>
@@ -988,7 +988,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
           </div>
         </div>
       )}
-      </div>
+    </div>
     </>
   );
 };
