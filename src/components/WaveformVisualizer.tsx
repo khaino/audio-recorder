@@ -785,9 +785,34 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   }, []);
 
   return (
-    <div className="flex flex-col items-center space-y-2">
-      {/* Mode Toggle Buttons - Reserve space to prevent layout shift */}
-      <div className="flex items-center space-x-2 self-start ml-4 h-6">
+    <>
+      {/* Context Menu - Rendered outside main component to prevent layout shifts */}
+      {contextMenu.visible && (
+        <div
+          className="fixed bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50"
+          style={{
+            left: `${contextMenu.x}px`,
+            top: `${contextMenu.y}px`,
+            position: 'fixed'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCutSelection();
+            }}
+            className="w-full px-4 py-2 text-left hover:bg-gray-100 text-sm text-gray-700 flex items-center"
+          >
+            <span className="mr-2">✂️</span>
+            Cut Selection
+          </button>
+        </div>
+      )}
+
+      <div className="flex flex-col items-center space-y-2">
+        {/* Mode Toggle Buttons - Reserve space to prevent layout shift */}
+        <div className="flex items-center space-x-2 self-start ml-4 h-8">
         {(playbackState === 'playing' || playbackState === 'paused' || 
           (recordingState === 'stopped' && duration > 0)) ? (
           <>
@@ -920,43 +945,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         )}
       </div>
       
-      {/* Context Menu */}
-      {contextMenu.visible && (
-        <div
-          className="fixed bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50"
-          style={{
-            left: contextMenu.x,
-            top: contextMenu.y,
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleCutSelection();
-            }}
-            className="w-full px-4 py-2 text-left hover:bg-gray-100 text-sm text-gray-700 flex items-center"
-          >
-            <span className="mr-2">✂️</span>
-            Cut Selection
-          </button>
-        </div>
-      )}
       
-      {/* Selection timestamps */}
-      {selectionStart !== null && selectionEnd !== null && (
-        <div className="text-sm text-gray-700 mt-2 bg-blue-50 px-3 py-2 rounded-lg border">
-          <div className="flex items-center justify-center space-x-4">
-            <span className="font-medium text-blue-800">Selection:</span>
-            <span className="text-blue-700">
-              {formatTime(Math.min(selectionStart, selectionEnd))} - {formatTime(Math.max(selectionStart, selectionEnd))}
-            </span>
-            <span className="text-blue-600 text-xs">
-              Duration: {formatTime(Math.abs(selectionEnd - selectionStart))}
-            </span>
-          </div>
-        </div>
-      )}
       
       {/* Processing Popup */}
       {(isProcessing || isAudioLoading) && (
@@ -999,6 +988,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 };
