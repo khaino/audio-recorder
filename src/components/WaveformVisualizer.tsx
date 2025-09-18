@@ -15,6 +15,7 @@ interface WaveformVisualizerProps {
   audioBlob?: Blob | null;
   canUndo?: boolean;
   onUndo?: () => void;
+  isAudioLoading?: boolean;
 }
 
 export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
@@ -29,7 +30,8 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   onCutAudio,
   audioBlob,
   canUndo,
-  onUndo
+  onUndo,
+  isAudioLoading
 }) => {
   const formatTime = (time: number) => {
     // Handle null, undefined, NaN, or negative values
@@ -154,7 +156,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   // Generate preloaded waveform from audio blob
   const generatePreloadedWaveform = useCallback(async (blob: Blob) => {
     try {
-      console.log('Generating preloaded waveform...');
       setIsWaveformLoaded(false);
       setIsProcessing(true);
       setProcessingProgress(0);
@@ -213,8 +214,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       setIsProcessing(false);
       setProcessingProgress(0);
       
-      console.log(`Preloaded waveform generated: ${waveform.length} points`);
-      
       await audioCtx.close();
     } catch (error) {
       console.error('Error generating preloaded waveform:', error);
@@ -261,7 +260,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       // Calculate RMS (Root Mean Square) amplitude - this is the most accurate representation
       let sum = 0;
       let hasValidData = false;
-      
+
       for (let i = 0; i < bufferLength; i++) {
         // Convert from 0-255 range to -1 to 1 range
         const sample = (timeDataArray[i] - 128) / 128;
@@ -636,7 +635,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
 
     // Check if clicking on current time indicator (always draggable regardless of mode)
     if (isNearCurrentTimeIndicator(x)) {
-      console.log('Starting to drag current time indicator');
       setIsDraggingCurrentTime(true);
       return;
     }
@@ -682,7 +680,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
 
     // Handle dragging current time indicator
     if (isDraggingCurrentTime) {
-      console.log('Dragging current time to:', time);
       if (onSeek) {
         onSeek(Math.max(0, Math.min(time, duration)));
       }
@@ -701,7 +698,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   const handleCanvasMouseUp = () => {
     // Handle ending drag of current time indicator
     if (isDraggingCurrentTime) {
-      console.log('Finished dragging current time indicator');
       setIsDraggingCurrentTime(false);
       return;
     }
@@ -718,17 +714,14 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         // Check if the click was outside the previous selection
         if (previousSelectionStart !== null && previousSelectionEnd !== null && !wasClickInsidePreviousSelection()) {
           // Clicked outside previous selection - deselect (no seeking in select mode)
-          console.log('Clicked outside selection - deselecting');
           setSelectionStart(null);
           setSelectionEnd(null);
         } else if (previousSelectionStart === null && previousSelectionEnd === null) {
           // No previous selection - just clear (no seeking in select mode)
-          console.log('Single click with no previous selection - clearing');
           setSelectionStart(null);
           setSelectionEnd(null);
         } else {
           // Clicked inside previous selection - restore the previous selection
-          console.log('Clicked inside selection - restoring previous selection');
           setSelectionStart(previousSelectionStart);
           setSelectionEnd(previousSelectionEnd);
         }
@@ -745,23 +738,13 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     event.preventDefault();
     event.stopPropagation();
     
-    console.log('Right click detected', {
-      selectionStart,
-      selectionEnd,
-      hasSelection: selectionStart !== null && selectionEnd !== null,
-      selectionLength: selectionStart !== null && selectionEnd !== null ? Math.abs(selectionEnd - selectionStart) : 0
-    });
-    
     // Show context menu only if there's a valid selection
     if (selectionStart !== null && selectionEnd !== null && Math.abs(selectionEnd - selectionStart) > 0.1) {
-      console.log('Showing context menu for valid selection');
       setContextMenu({
         x: event.clientX,
         y: event.clientY,
         visible: true
       });
-    } else {
-      console.log('No valid selection - not showing context menu');
     }
   };
 
@@ -790,7 +773,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       if (target.closest('canvas')) return;
       
       // Hide context menu for any other clicks
-      console.log('Click outside detected, hiding context menu');
       setContextMenu(prev => ({ ...prev, visible: false }));
     };
 
@@ -951,7 +933,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              console.log('Cut button clicked');
               handleCutSelection();
             }}
             className="w-full px-4 py-2 text-left hover:bg-gray-100 text-sm text-gray-700 flex items-center"
@@ -959,9 +940,6 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
             <span className="mr-2">✂️</span>
             Cut Selection
           </button>
-          <div className="px-4 py-1 text-xs text-gray-500 border-t">
-            Debug: Menu visible at ({contextMenu.x}, {contextMenu.y})
-          </div>
         </div>
       )}
       
@@ -981,7 +959,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       )}
       
       {/* Processing Popup */}
-      {isProcessing && (
+      {(isProcessing || isAudioLoading) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
             <div className="text-center">
@@ -992,21 +970,30 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Processing Audio</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  {isProcessing ? 'Processing Audio' : 'Preparing Playback'}
+                </h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Generating waveform for playback...
+                  {isProcessing 
+                    ? 'Generating waveform for playback...'
+                    : 'Setting up audio enhancement and playback...'
+                  }
                 </p>
               </div>
               
               {/* Progress Bar */}
               <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                <div 
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
-                  style={{ width: `${processingProgress}%` }}
-                ></div>
+                {isProcessing ? (
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                    style={{ width: `${processingProgress}%` }}
+                  ></div>
+                ) : (
+                  <div className="bg-blue-600 h-2 rounded-full animate-pulse w-full"></div>
+                )}
               </div>
               <div className="text-xs text-gray-500">
-                {processingProgress}% complete
+                {isProcessing ? `${processingProgress}% complete` : 'Please wait...'}
               </div>
             </div>
           </div>

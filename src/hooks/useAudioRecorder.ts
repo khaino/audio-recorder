@@ -342,8 +342,6 @@ export const useAudioRecorder = (selectedDeviceId?: string) => {
     
     // Update undo history
     setUndoHistory(remainingHistory);
-    
-    console.log('Undo completed - restored previous audio state');
   }, [undoHistory, audioUrl]);
 
   const cutAudio = useCallback(async (startTime: number, endTime: number) => {

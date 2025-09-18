@@ -9,6 +9,7 @@ export interface AudioPlayerData {
   progress: number;
   audioContext: AudioContext | null;
   analyser: AnalyserNode | null;
+  isLoading: boolean;
 }
 
 export interface AudioPlayerActions {
@@ -28,7 +29,7 @@ export const useAudioPlayer = (
   const [duration, setDuration] = useState(0);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
-  const [, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [processedAudioUrl, setProcessedAudioUrl] = useState<string | null>(null);
   const [lastProcessedUrl, setLastProcessedUrl] = useState<string | null>(null);
   const [lastProcessedVolume, setLastProcessedVolume] = useState<'low' | 'standard' | 'high' | null>(null);
@@ -72,7 +73,7 @@ export const useAudioPlayer = (
     
     
     try {
-      setIsProcessing(true);
+      setIsLoading(true);
       
       // Load audio as buffer
       const response = await fetch(url);
@@ -113,12 +114,12 @@ export const useAudioPlayer = (
       const processedUrl = URL.createObjectURL(blob);
       
       await audioCtx.close();
-      setIsProcessing(false);
+      setIsLoading(false);
       
       return processedUrl;
     } catch (error) {
       console.error('Audio processing failed:', error);
-      setIsProcessing(false);
+      setIsLoading(false);
       return null;
     }
   }, [autoEnhance, volumeLevel]);
@@ -531,7 +532,8 @@ export const useAudioPlayer = (
       duration,
       progress,
       audioContext,
-      analyser
+      analyser,
+      isLoading
     } as AudioPlayerData,
     actions: {
       play,

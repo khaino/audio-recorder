@@ -156,6 +156,7 @@ function App() {
               audioBlob={recorderData.audioBlob}
               canUndo={recorderData.canUndo}
               onUndo={recorderActions.undo}
+              isAudioLoading={playerData.isLoading}
             />
           </div>
 
