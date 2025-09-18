@@ -17,16 +17,21 @@ export const useAudioDevices = () => {
         setLoading(true);
         setError(null);
         
-        // Request permission first
-        await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Try to get devices without requesting permission first
+        // This avoids triggering the browser's recording indicator
         
         const deviceList = await navigator.mediaDevices.enumerateDevices();
         const audioInputs = deviceList
           .filter(device => device.kind === 'audioinput')
-          .map(device => ({
+          .map((device, index) => ({
             deviceId: device.deviceId,
-            label: device.label || `Microphone ${device.deviceId.slice(0, 8)}`
+            label: device.label || `Microphone ${index + 1}`
           }));
+        
+        // If we don't have any devices, add a default option
+        if (audioInputs.length === 0) {
+          audioInputs.push({ deviceId: 'default', label: 'Default Microphone' });
+        }
         
         setDevices(audioInputs);
         

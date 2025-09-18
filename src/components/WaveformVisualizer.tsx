@@ -947,8 +947,8 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       
       
       
-      {/* Processing Popup */}
-      {(isProcessing || isAudioLoading) && (
+      {/* Processing Popup - Only show for waveform processing, not quick audio operations */}
+      {isProcessing && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
             <div className="text-center">
@@ -960,29 +960,22 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
                   </svg>
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {isProcessing ? 'Processing Audio' : 'Preparing Playback'}
+                  Processing Audio
                 </h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  {isProcessing 
-                    ? 'Generating waveform for playback...'
-                    : 'Setting up audio enhancement and playback...'
-                  }
+                  Generating waveform for playback...
                 </p>
               </div>
               
               {/* Progress Bar */}
               <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                {isProcessing ? (
-                  <div 
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
-                    style={{ width: `${processingProgress}%` }}
-                  ></div>
-                ) : (
-                  <div className="bg-blue-600 h-2 rounded-full animate-pulse w-full"></div>
-                )}
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${processingProgress}%` }}
+                ></div>
               </div>
               <div className="text-xs text-gray-500">
-                {isProcessing ? `${processingProgress}% complete` : 'Please wait...'}
+                {processingProgress}% complete
               </div>
             </div>
           </div>
