@@ -126,7 +126,7 @@ export const useFileManager = () => {
       
       // Process audio in blocks
       for (let offset = 0; offset < totalSamples; offset += blockSize) {
-        const currentBlockSize = Math.min(blockSize, totalSamples - offset);
+        // const currentBlockSize = Math.min(blockSize, totalSamples - offset); // Removed unused variable
         
         // Prepare buffers
         const leftBuffer = new Int16Array(blockSize);
@@ -153,7 +153,7 @@ export const useFileManager = () => {
         }
         
         // Encode this block
-        let encoded: Int8Array;
+        let encoded: Uint8Array;
         if (channels === 1) {
           encoded = mp3encoder.encodeBuffer(leftBuffer);
         } else {
@@ -161,14 +161,14 @@ export const useFileManager = () => {
         }
         
         if (encoded.length > 0) {
-          mp3Data.push(new Uint8Array(encoded));
+          mp3Data.push(encoded);
         }
       }
       
       // Flush encoder
       const remaining = mp3encoder.flush();
       if (remaining.length > 0) {
-        mp3Data.push(new Uint8Array(remaining));
+        mp3Data.push(remaining);
       }
       
       await audioContext.close();
@@ -221,7 +221,7 @@ export const useFileManager = () => {
         );
         
         // Get processed source and output
-        const { source: processedSource, output: processedOutput } = processBuffer(audioBuffer, offlineContext);
+        const { source: processedSource, output: processedOutput } = processBuffer(audioBuffer, offlineContext as unknown as AudioContext);
         
         // Connect to destination for rendering
         processedOutput.connect(offlineContext.destination);
