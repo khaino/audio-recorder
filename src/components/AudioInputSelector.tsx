@@ -38,8 +38,8 @@ export const AudioInputSelector: React.FC<AudioInputSelectorProps> = ({
   }
 
   return (
-    <div className="flex items-center space-x-3">
-      <label htmlFor="audio-input-select" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+    <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+      <label htmlFor="audio-input-select" className="text-sm font-medium text-gray-700 sm:whitespace-nowrap">
         Audio Input Device
       </label>
       <select
@@ -47,7 +47,7 @@ export const AudioInputSelector: React.FC<AudioInputSelectorProps> = ({
         value={selectedDeviceId}
         onChange={(e) => handleDeviceChange(e.target.value)}
         disabled={disabled}
-        className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-medium flex-1 ${
+        className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-medium w-full sm:flex-1 sm:min-w-0 ${
           disabled 
             ? 'bg-gray-100 text-gray-500 cursor-not-allowed' 
             : 'bg-white text-gray-900'

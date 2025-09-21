@@ -86,23 +86,23 @@ function App() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <header className="text-center mb-12">
-          <div className="flex items-center justify-center mb-4">
+        <header className="text-center mb-6 sm:mb-12">
+          <div className="flex items-center justify-center mb-2 sm:mb-4">
             <img 
               src={logo} 
               alt="Audio Recorder Logo" 
-              className="w-12 h-12"
+              className="w-10 h-10 sm:w-12 sm:h-12"
             />
-            <h1 className="text-4xl font-bold text-gray-900 mx-4">
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mx-2 sm:mx-4">
               Audio Recorder
             </h1>
             <img 
               src={logo} 
               alt="Audio Recorder Logo" 
-              className="w-12 h-12"
+              className="w-10 h-10 sm:w-12 sm:h-12"
             />
           </div>
-          <p className="text-lg text-gray-600">
+          <p className="text-base sm:text-lg text-gray-600">
             Record, enhance, and playback professional-quality audio
           </p>
         </header>
@@ -112,12 +112,12 @@ function App() {
         {/* Main Content */}
         <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6">
           {/* Top Controls Row */}
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
             {/* Left: Audio Input Device or Start New Recording */}
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
               {/* Audio Input Device - Only show when no recording exists, disable during recording */}
               {!hasRecording && (
-                <div className="w-64">
+                <div className="w-full sm:w-80 lg:w-auto lg:min-w-80">
                   <AudioInputSelector 
                     onDeviceChange={handleDeviceChange}
                     disabled={recorderData.state === 'countdown' || recorderData.state === 'recording' || recorderData.state === 'paused'}
@@ -130,7 +130,7 @@ function App() {
                 <button
                   onClick={handleStartNewRecording}
                   disabled={recorderData.state === 'countdown' || playerData.state === 'playing'}
-                  className={`flex items-center justify-center space-x-2 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-medium w-32 ${
+                  className={`flex items-center justify-center space-x-2 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-medium w-full sm:w-32 ${
                     (recorderData.state === 'countdown' || playerData.state === 'playing')
                       ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-gray-300'
                       : 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100 hover:text-orange-800'
@@ -146,13 +146,13 @@ function App() {
             
             {/* Right: Volume Control - Only show when there's a recording for playback */}
             {hasRecording && (
-              <div className="flex items-center space-x-3 ml-auto">
-                <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Volume</label>
+              <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full sm:w-auto sm:ml-auto">
+                <label className="text-sm font-medium text-gray-700 sm:whitespace-nowrap">Volume</label>
                 <select
                   value={selectedVolume}
                   onChange={handleVolumeChange}
                   disabled={playerData.state === 'playing'}
-                  className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-medium w-32 ${
+                  className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-medium w-full sm:w-32 ${
                     playerData.state === 'playing'
                       ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                       : 'bg-white text-gray-900'
@@ -213,11 +213,11 @@ function App() {
           {hasRecording && (
             <div className="flex flex-col items-center space-y-4 pt-6 border-t border-gray-200">
               {/* Download Button and Format Selection */}
-              <div className="flex items-center space-x-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-center space-y-3 sm:space-y-0 sm:space-x-3 w-full max-w-md">
                 <button
                   onClick={handleDownload}
                   disabled={isConverting}
-                  className="flex items-center space-x-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors duration-200 shadow-lg"
+                  className="flex items-center justify-center space-x-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors duration-200 shadow-lg w-full sm:w-auto text-sm"
                 >
                   {isConverting ? (
                     <>
@@ -239,7 +239,7 @@ function App() {
                 <select
                   value={selectedFormat}
                   onChange={handleFormatChange}
-                  className="px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm font-medium"
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm font-medium w-full sm:w-auto sm:min-w-24"
                 >
                   <option value="mp3">MP3</option>
                   <option value="wav">WAV</option>
