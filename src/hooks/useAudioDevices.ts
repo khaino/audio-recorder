@@ -12,19 +12,23 @@ export const useAudioDevices = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isInitialized = false;
+
     const getDevices = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        // Request microphone permission to get real device labels
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          // Stop the stream immediately - we just needed permission
-          stream.getTracks().forEach(track => track.stop());
-        } catch (permissionError) {
-          // If permission denied, we'll still try to get devices but with generic labels
-          console.warn('Microphone permission denied, using generic device labels');
+        // Request microphone permission to get real device labels (only on first load)
+        if (!isInitialized) {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            // Stop the stream immediately - we just needed permission
+            stream.getTracks().forEach(track => track.stop());
+          } catch (permissionError) {
+            // If permission denied, we'll still try to get devices but with generic labels
+            console.warn('Microphone permission denied, using generic device labels');
+          }
         }
         
         const deviceList = await navigator.mediaDevices.enumerateDevices();
@@ -42,9 +46,10 @@ export const useAudioDevices = () => {
         
         setDevices(audioInputs);
         
-        // Set default device if none selected
-        if (audioInputs.length > 0 && !selectedDeviceId) {
+        // Set default device only on first initialization
+        if (!isInitialized && audioInputs.length > 0) {
           setSelectedDeviceId(audioInputs[0].deviceId);
+          isInitialized = true;
         }
       } catch (err) {
         setError('Failed to access audio devices. Please grant microphone permission.');
@@ -66,7 +71,7 @@ export const useAudioDevices = () => {
     return () => {
       navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
     };
-  }, [selectedDeviceId]);
+  }, []); // Remove selectedDeviceId dependency to prevent infinite loop
 
   return {
     devices,
