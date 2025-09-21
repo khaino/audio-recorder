@@ -342,6 +342,9 @@ export const useAudioPlayer = (
     }
 
     if (audioUrl) {
+      // Set loading state when starting to process/load audio
+      setIsLoading(true);
+      
       // Auto-process audio when loaded
       if (autoEnhance) {
         // Check if we already processed this URL with the same volume level
@@ -352,6 +355,7 @@ export const useAudioPlayer = (
           
           audio.addEventListener('loadedmetadata', () => {
             setDuration(audio.duration);
+            setIsLoading(false); // Audio is ready for playback
             // Setup audio analysis once metadata is loaded
             setTimeout(() => setupAudioAnalysis(audio), 100); // Small delay to ensure audio is ready
           });
@@ -420,6 +424,7 @@ export const useAudioPlayer = (
       
         audio.addEventListener('loadedmetadata', () => {
           setDuration(audio.duration);
+          setIsLoading(false); // Audio is ready for playback
           // Setup audio analysis once metadata is loaded
           setTimeout(() => setupAudioAnalysis(audio), 100); // Small delay to ensure audio is ready
         });
@@ -463,7 +468,7 @@ export const useAudioPlayer = (
   }, [audioUrl, autoEnhance, volumeLevel, processAudio, forceRecreation]);
 
   const play = useCallback(async () => {
-    if (audioRef.current) {
+    if (audioRef.current && !isLoading) {
       try {
         // Ensure we're starting from the current position
         if (state === 'paused') {
@@ -479,10 +484,12 @@ export const useAudioPlayer = (
         console.error('Audio playback failed:', error);
         setState('idle');
       }
+    } else if (isLoading) {
+      console.log('Cannot play: audio is still loading');
     } else {
       console.error('Cannot play: audio element is not available');
     }
-  }, [startTimer, state]);
+  }, [startTimer, state, isLoading]);
 
   const pause = useCallback(() => {
     if (audioRef.current) {
