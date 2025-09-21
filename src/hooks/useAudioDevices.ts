@@ -17,8 +17,15 @@ export const useAudioDevices = () => {
         setLoading(true);
         setError(null);
         
-        // Try to get devices without requesting permission first
-        // This avoids triggering the browser's recording indicator
+        // Request microphone permission to get real device labels
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          // Stop the stream immediately - we just needed permission
+          stream.getTracks().forEach(track => track.stop());
+        } catch (permissionError) {
+          // If permission denied, we'll still try to get devices but with generic labels
+          console.warn('Microphone permission denied, using generic device labels');
+        }
         
         const deviceList = await navigator.mediaDevices.enumerateDevices();
         const audioInputs = deviceList
