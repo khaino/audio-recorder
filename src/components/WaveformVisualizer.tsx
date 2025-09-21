@@ -619,6 +619,181 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     };
   }, [waveformData, recordingState, playbackState, currentTime, duration, countdownValue, selectionStart, selectionEnd, timeToCanvasX]);
 
+  // Add touch event listeners with passive: false to allow preventDefault
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    let touchStartPos: { x: number; y: number } | null = null;
+    let hasMoved = false;
+    let lastTouchTime = 0;
+    let touchSession = false;
+
+    const handleTouchStart = (event: TouchEvent) => {
+      const now = Date.now();
+      
+      // Debounce rapid touch events (ignore if within 50ms of last touch)
+      if (now - lastTouchTime < 50 && touchSession) {
+        return;
+      }
+      
+      if (duration === 0) {
+        return;
+      }
+      event.preventDefault();
+      
+      const rect = canvas.getBoundingClientRect();
+      const touch = event.touches[0];
+      const x = touch.clientX - rect.left;
+      const time = canvasXToTime(x);
+
+      // Store touch start position for long press detection
+      touchStartPos = { x: touch.clientX, y: touch.clientY };
+      hasMoved = false;
+      lastTouchTime = now;
+      touchSession = true;
+
+      setContextMenu(prev => ({ ...prev, visible: false }));
+
+      if (isNearCurrentTimeIndicator(x)) {
+        setIsDraggingCurrentTime(true);
+        return;
+      }
+
+      if (interactionMode === 'seek') {
+        if (onSeek) onSeek(time);
+        setSelectionStart(null);
+        setSelectionEnd(null);
+        return;
+      }
+
+      // Check if we're touching inside an existing selection
+      const existingSelectionStart = selectionStart;
+      const existingSelectionEnd = selectionEnd;
+      const hasExistingSelection = existingSelectionStart !== null && existingSelectionEnd !== null && 
+                                  Math.abs(existingSelectionEnd - existingSelectionStart) > 0.1;
+      
+      let touchingExistingSelection = false;
+      if (hasExistingSelection) {
+        const startX = timeToRenderedX(Math.min(existingSelectionStart, existingSelectionEnd));
+        const endX = timeToRenderedX(Math.max(existingSelectionStart, existingSelectionEnd));
+        touchingExistingSelection = x >= startX && x <= endX;
+      }
+
+      if (interactionMode === 'select') {
+        if (waveformData.length === 0 && !isWaveformLoaded) return;
+        
+        // Only start new selection if not touching existing selection
+        if (!touchingExistingSelection) {
+          setPreviousSelectionStart(selectionStart);
+          setPreviousSelectionEnd(selectionEnd);
+          setInitialClickX(x);
+          setSelectionStart(time);
+          setSelectionEnd(time);
+          setIsSelecting(true);
+        }
+      }
+
+      // Start long press timer only if we have an existing selection or are touching one
+      if (interactionMode === 'select' && (hasExistingSelection || touchingExistingSelection)) {
+        // Show context menu after delay
+        setTimeout(() => {
+          // Show context menu
+          setContextMenu({
+            x: touch.clientX,
+            y: touch.clientY,
+            visible: true
+          });
+          
+          // Provide haptic feedback if available
+          if ('vibrate' in navigator) {
+            navigator.vibrate(50);
+          }
+        }, 300); // 300ms long press threshold
+      }
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (duration === 0) return;
+      event.preventDefault();
+      
+      const rect = canvas.getBoundingClientRect();
+      const touch = event.touches[0];
+      const x = touch.clientX - rect.left;
+      const time = canvasXToTime(x);
+
+      // Check if touch has moved significantly
+      if (touchStartPos && !hasMoved) {
+        const moveThreshold = 20; // 20px threshold (more forgiving)
+        const deltaX = Math.abs(touch.clientX - touchStartPos.x);
+        const deltaY = Math.abs(touch.clientY - touchStartPos.y);
+        
+        if (deltaX > moveThreshold || deltaY > moveThreshold) {
+          hasMoved = true;
+        }
+      }
+
+      if (isDraggingCurrentTime) {
+        if (onSeek) onSeek(time);
+        return;
+      }
+
+      if (interactionMode === 'select' && isSelecting) {
+        setSelectionEnd(time);
+      }
+
+      setIsHoveringCurrentTime(isNearCurrentTimeIndicator(x));
+    };
+
+    const handleTouchEnd = (event: TouchEvent) => {
+      event.preventDefault();
+
+      // Reset touch tracking variables
+      touchStartPos = null;
+      hasMoved = false;
+      touchSession = false;
+      
+      if (isDraggingCurrentTime) {
+        setIsDraggingCurrentTime(false);
+        return;
+      }
+
+      if (interactionMode !== 'select' || !isSelecting) return;
+      setIsSelecting(false);
+
+      if (selectionStart !== null && selectionEnd !== null) {
+        const timeDiff = Math.abs(selectionEnd - selectionStart);
+        if (timeDiff < 0.1) {
+          if (previousSelectionStart !== null && previousSelectionEnd !== null && !wasClickInsidePreviousSelection()) {
+            setSelectionStart(null);
+            setSelectionEnd(null);
+          } else if (previousSelectionStart === null && previousSelectionEnd === null) {
+            setSelectionStart(null);
+            setSelectionEnd(null);
+          } else {
+            setSelectionStart(previousSelectionStart);
+            setSelectionEnd(previousSelectionEnd);
+          }
+        }
+      }
+
+      setPreviousSelectionStart(null);
+      setPreviousSelectionEnd(null);
+      setInitialClickX(null);
+    };
+
+    // Add event listeners with passive: false to allow preventDefault
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleTouchStart);
+      canvas.removeEventListener('touchmove', handleTouchMove);
+      canvas.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [duration, interactionMode, onSeek, waveformData.length, isWaveformLoaded, selectionStart, selectionEnd, isDraggingCurrentTime, isSelecting, previousSelectionStart, previousSelectionEnd, canvasXToTime, isNearCurrentTimeIndicator, wasClickInsidePreviousSelection]);
+
   const handleCanvasMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
     if (duration === 0) return;
 
